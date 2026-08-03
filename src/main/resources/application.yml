@@ -4,19 +4,24 @@ spring:
   application:
     name: agency-os-api
 
+  threads:
+    virtual:
+      enabled: true
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
+    hikari:
+      connection-timeout: 10000
 
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: validate
+      ddl-auto: none
     properties:
-      hibernate.tenant_identifier_resolver: dev.eyadsharkawy.agencyosapi.config.TenantResolver
-      hibernate.multi_tenant_connection_provider: dev.eyadsharkawy.agencyosapi.config.TenantConnectionProvider
+      hibernate.multiTenancy: SCHEMA
 
   flyway:
     enabled: true
@@ -35,3 +40,7 @@ app:
 
 server:
   port: ${PORT:8080}
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
