@@ -1,0 +1,37 @@
+package dev.eyadsharkawy.agency_os_api.tenant.project.entity;
+
+import dev.eyadsharkawy.agency_os_api.shared.entity.BaseEntity;
+import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.math.BigDecimal;
+
+@Setter
+@Getter
+@Entity
+@Table(name = "projects")
+@SQLDelete(sql = "UPDATE projects SET is_active = false WHERE id = ?")
+@SQLRestriction("is_active = true")
+public class Project extends BaseEntity {
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "budget")
+    private BigDecimal budget;
+
+    @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private ProjectStatus status = ProjectStatus.PLANNING;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id", nullable = false)
+    private Client client;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+}
