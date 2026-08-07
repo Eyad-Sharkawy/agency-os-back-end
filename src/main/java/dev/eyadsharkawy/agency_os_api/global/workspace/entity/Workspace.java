@@ -1,0 +1,37 @@
+package dev.eyadsharkawy.agency_os_api.global.workspace.entity;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
+import dev.eyadsharkawy.agency_os_api.shared.entity.BaseEntity;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+
+import java.util.HashSet;
+import java.util.Set;
+
+@Getter
+@Setter
+@Entity
+@Table(name = "workspaces", schema = "public")
+@SQLDelete(sql = "UPDATE public.workspaces SET is_active = false WHERE id = ?")
+@SQLRestriction("is_active = true")
+public class Workspace extends BaseEntity {
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "tenant_id", nullable = false, unique = true, updatable = false)
+    private String tenantId;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    @JsonIgnore
+    @ManyToMany(mappedBy = "workspaces")
+    private Set<AppUser> users = new HashSet<>();
+}
