@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -100,9 +99,7 @@ public class TenantConnectionProvider implements MultiTenantConnectionProvider<S
     }
 
     private void executeSchemaChange(Connection connection, String schema) throws SQLException {
-        log.trace("Executing SQL: SET SCHEMA '{}'", schema);
-        try (Statement statement = connection.createStatement()) {
-            statement.execute("SET SCHEMA '" + schema + "'");
-        }
+        log.trace("Switching connection schema to: '{}'", schema);
+        connection.setSchema(schema);
     }
 }

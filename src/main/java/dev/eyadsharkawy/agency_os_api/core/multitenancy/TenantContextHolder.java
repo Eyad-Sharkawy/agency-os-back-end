@@ -6,12 +6,12 @@ public class TenantContextHolder {
     private TenantContextHolder() {
     }
 
-    public static void setTenantId(String tenantId) {
-        CURRENT_TENANT.set(tenantId);
-    }
-
     public static String getTenantId() {
         return CURRENT_TENANT.get();
+    }
+
+    public static void setTenantId(String tenantId) {
+        CURRENT_TENANT.set(tenantId);
     }
 
     public static void clear() {
