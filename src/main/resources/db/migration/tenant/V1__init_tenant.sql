@@ -26,14 +26,26 @@ CREATE TABLE projects
 
 CREATE TABLE tasks
 (
-    id          UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
-    project_id  UUID         NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
-    title       VARCHAR(255) NOT NULL,
-    assignee_id VARCHAR(255), -- Keycloak ID, no FK: user lives in public schema
-    status      VARCHAR(20)  NOT NULL DEFAULT 'TODO'
+    id                UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
+    project_id        UUID         NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+    title             VARCHAR(255) NOT NULL,
+    description       TEXT,
+    start_date        TIMESTAMPTZ,
+    due_date          TIMESTAMPTZ,
+    estimated_minutes INT,
+    priority          VARCHAR(20)  NOT NULL DEFAULT 'MEDIUM'
+        CHECK (priority IN ('LOW', 'MEDIUM', 'HIGH', 'URGENT')),
+    status            VARCHAR(20)  NOT NULL DEFAULT 'TODO'
         CHECK (status IN ('TODO', 'IN_PROGRESS', 'REVIEW', 'DONE')),
-    created_at  TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ  NOT NULL DEFAULT now()
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
+    updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE TABLE task_assignees
+(
+    task_id UUID REFERENCES tasks (id) ON DELETE CASCADE,
+    user_id VARCHAR(255) NOT NULL, -- Keycloak ID
+    PRIMARY KEY (task_id, user_id)
 );
 
 CREATE TABLE time_entries
@@ -60,7 +72,7 @@ CREATE TABLE invoices
 
 CREATE INDEX idx_projects_client_id ON projects (client_id);
 CREATE INDEX idx_tasks_project_id ON tasks (project_id);
-CREATE INDEX idx_tasks_assignee_id ON tasks (assignee_id);
+CREATE INDEX idx_task_assignees_user_id ON task_assignees (user_id);
 CREATE INDEX idx_time_entries_task_id ON time_entries (task_id);
 CREATE INDEX idx_time_entries_user_id ON time_entries (user_id);
 CREATE INDEX idx_invoices_client_id ON invoices (client_id);
