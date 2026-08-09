@@ -59,6 +59,13 @@ CREATE TABLE time_entries
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
+CREATE TABLE active_timers
+(
+    user_id    VARCHAR(255) PRIMARY KEY,
+    task_id    UUID        NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
+    start_time TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE invoices
 (
     id           UUID PRIMARY KEY        DEFAULT gen_random_uuid(),

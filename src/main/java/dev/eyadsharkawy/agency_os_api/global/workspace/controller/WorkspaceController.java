@@ -1,7 +1,7 @@
 package dev.eyadsharkawy.agency_os_api.global.workspace.controller;
 
+import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceResponse;
-import dev.eyadsharkawy.agency_os_api.global.workspace.dto.workspaceRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.service.WorkspaceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,7 @@ public class WorkspaceController {
     @PostMapping
     public ResponseEntity<WorkspaceResponse> createWorkspace(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody workspaceRequest request) {
+            @Valid @RequestBody WorkspaceRequest request) {
 
         WorkspaceResponse response = workspaceService.createWorkspace(jwt, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -37,7 +37,7 @@ public class WorkspaceController {
     @PutMapping("/{tenantId}")
     public ResponseEntity<WorkspaceResponse> updateWorkspace(
             @PathVariable String tenantId,
-            @Valid @RequestBody workspaceRequest request) {
+            @Valid @RequestBody WorkspaceRequest request) {
 
         WorkspaceResponse response = workspaceService.updateUserWorkspaceByTenantId(tenantId, request);
         return ResponseEntity.ok(response);

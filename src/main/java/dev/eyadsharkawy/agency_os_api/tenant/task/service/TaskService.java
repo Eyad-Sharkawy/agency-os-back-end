@@ -7,6 +7,7 @@ import dev.eyadsharkawy.agency_os_api.tenant.task.dto.TaskRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.task.dto.TaskResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.task.entity.Task;
 import dev.eyadsharkawy.agency_os_api.tenant.task.repository.TaskRepository;
+import dev.eyadsharkawy.agency_os_api.tenant.time_entry.repository.TimeEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class TaskService {
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
+    private final TimeEntryRepository timeEntryRepository;
 
     @Transactional
     public TaskResponse createTask(TaskRequest request) {
@@ -33,14 +35,14 @@ public class TaskService {
 
         Task savedTask = taskRepository.save(task);
 
-        return TaskResponse.fromEntity(savedTask, 0);
+        return TaskResponse.fromEntity(savedTask, getTotalLoggedTimeById(savedTask.getId()));
     }
 
     @Transactional(readOnly = true)
     public List<TaskResponse> getAllTasks() {
         log.info("Fetching all tasks");
         return taskRepository.findAll().stream()
-                .map(task -> TaskResponse.fromEntity(task, 0))
+                .map(task -> TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId())))
                 .toList();
     }
 
@@ -49,7 +51,7 @@ public class TaskService {
         log.info("Fetching task with id: {}", id);
         Task task = findTaskByIdOrThrow(id);
 
-        return TaskResponse.fromEntity(task, 0);
+        return TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId()));
     }
 
     @Transactional(readOnly = true)
@@ -60,7 +62,8 @@ public class TaskService {
         }
 
         return taskRepository.findByProjectId(projectId).stream()
-                .map(task -> TaskResponse.fromEntity(task, 0))
+                .map(task -> TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId()))
+                )
                 .toList();
     }
 
@@ -69,7 +72,7 @@ public class TaskService {
         log.info("Fetching tasks for assignee: {}", assigneeId);
 
         return taskRepository.findByAssigneeId(assigneeId).stream()
-                .map(task -> TaskResponse.fromEntity(task, 0))
+                .map(task -> TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId())))
                 .toList();
     }
 
@@ -84,7 +87,7 @@ public class TaskService {
 
         Task updatedTask = taskRepository.save(task);
 
-        return TaskResponse.fromEntity(updatedTask, 0);
+        return TaskResponse.fromEntity(updatedTask, getTotalLoggedTimeById(updatedTask.getId()));
     }
 
     @Transactional
@@ -102,5 +105,9 @@ public class TaskService {
     private Project findProjectByIdOrThrow(UUID id) {
         return projectRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
+    }
+
+    private int getTotalLoggedTimeById(UUID id) {
+        return timeEntryRepository.sumDurationMinutesByTaskId(id);
     }
 }

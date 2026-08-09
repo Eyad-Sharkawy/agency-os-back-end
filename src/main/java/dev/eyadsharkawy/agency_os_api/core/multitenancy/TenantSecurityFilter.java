@@ -32,7 +32,8 @@ public class TenantSecurityFilter extends OncePerRequestFilter {
 
     private static final List<String> GLOBAL_ENDPOINTS = List.of(
             "/api/v1/workspaces",
-            "/error"
+            "/error",
+            "/ws-timer"
     );
 
     private final ObjectMapper objectMapper;

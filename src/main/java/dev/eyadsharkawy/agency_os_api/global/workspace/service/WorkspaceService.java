@@ -3,8 +3,8 @@ package dev.eyadsharkawy.agency_os_api.global.workspace.service;
 import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.repository.AppUserRepository;
+import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceResponse;
-import dev.eyadsharkawy.agency_os_api.global.workspace.dto.workspaceRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace;
 import dev.eyadsharkawy.agency_os_api.global.workspace.event.WorkspaceCreatedEvent;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
@@ -28,7 +28,7 @@ public class WorkspaceService {
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
-    public WorkspaceResponse createWorkspace(Jwt jwt, workspaceRequest request) {
+    public WorkspaceResponse createWorkspace(Jwt jwt, WorkspaceRequest request) {
         String keycloakId = jwt.getSubject();
         log.info("Creating workspace [{}] for Keycloak user [{}]", request.name(), keycloakId);
 
@@ -74,7 +74,7 @@ public class WorkspaceService {
     }
 
     @Transactional
-    public WorkspaceResponse updateUserWorkspaceByTenantId(String tenantId, workspaceRequest workspaceRequest) {
+    public WorkspaceResponse updateUserWorkspaceByTenantId(String tenantId, WorkspaceRequest workspaceRequest) {
         Workspace workspace = workspaceRepository.findByTenantId(tenantId)
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with tenant id: " + tenantId));
 

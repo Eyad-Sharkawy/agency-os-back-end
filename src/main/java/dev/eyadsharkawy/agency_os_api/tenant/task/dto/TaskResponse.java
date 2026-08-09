@@ -39,7 +39,7 @@ public record TaskResponse(
                 task.getPriority(),
                 task.getStatus(),
                 task.getProject().getId(),
-                task.getAssigneeIds(),
+                Set.copyOf(task.getAssigneeIds()),
                 totalLoggedMinutes,
                 isOverBudget,
                 task.getCreatedAt(),
