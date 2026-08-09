@@ -13,15 +13,16 @@ CREATE TABLE clients
 
 CREATE TABLE projects
 (
-    id         UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
-    client_id  UUID         NOT NULL REFERENCES clients (id) ON DELETE CASCADE,
-    name       VARCHAR(255) NOT NULL,
-    budget     NUMERIC(12, 2),
-    status     VARCHAR(20)  NOT NULL DEFAULT 'PLANNING'
-        CHECK (status IN ('PLANNING', 'IN_PROGRESS', 'DELIVERED')),
-    is_active  BOOLEAN      NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ  NOT NULL DEFAULT now()
+    id           UUID PRIMARY KEY        DEFAULT gen_random_uuid(),
+    client_id    UUID           NOT NULL REFERENCES clients (id) ON DELETE RESTRICT,
+    name         VARCHAR(100)   NOT NULL,
+    budget       NUMERIC(12, 2) NOT NULL DEFAULT 0,
+    status       VARCHAR(20)    NOT NULL DEFAULT 'PLANNING'
+        CHECK (status IN ('PLANNING', 'IN_PROGRESS', 'ON_HOLD', 'DELIVERED')),
+    billing_rate NUMERIC(12, 2) NOT NULL DEFAULT 100.00,
+    is_active    BOOLEAN        NOT NULL DEFAULT true,
+    created_at   TIMESTAMPTZ    NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ    NOT NULL DEFAULT now()
 );
 
 CREATE TABLE tasks
@@ -77,9 +78,14 @@ CREATE TABLE invoices
     updated_at   TIMESTAMPTZ    NOT NULL DEFAULT now()
 );
 
+
+ALTER TABLE time_entries
+    ADD COLUMN invoice_id UUID REFERENCES invoices (id) ON DELETE SET NULL;
+
 CREATE INDEX idx_projects_client_id ON projects (client_id);
 CREATE INDEX idx_tasks_project_id ON tasks (project_id);
 CREATE INDEX idx_task_assignees_user_id ON task_assignees (user_id);
 CREATE INDEX idx_time_entries_task_id ON time_entries (task_id);
 CREATE INDEX idx_time_entries_user_id ON time_entries (user_id);
 CREATE INDEX idx_invoices_client_id ON invoices (client_id);
+CREATE INDEX idx_time_entries_invoice_id ON time_entries (invoice_id);

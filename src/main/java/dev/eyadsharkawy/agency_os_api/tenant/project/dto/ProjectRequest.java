@@ -19,6 +19,10 @@ public record ProjectRequest(
         ProjectStatus status,
 
         @NotNull(message = "Client ID is required")
-        UUID clientId
+        UUID clientId,
+
+        @NotNull(message = "Billing rate is required")
+        @PositiveOrZero(message = "Billing rate must be zero or positive")
+        BigDecimal billingRate
 ) {
 }

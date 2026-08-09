@@ -28,6 +28,9 @@ public class Workspace extends BaseEntity {
     @Column(name = "tenant_id", nullable = false, unique = true, updatable = false)
     private String tenantId;
 
+    @Column(name = "contact_email", nullable = false)
+    private String contactEmail;
+
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 

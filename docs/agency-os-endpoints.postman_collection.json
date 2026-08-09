@@ -1,0 +1,1066 @@
+{
+  "info": {
+    "_postman_id": "8b4652c8-b61e-401c-a4e1-5b6b637153f2",
+    "name": "Agency OS API",
+    "description": "Complete Multi-Tenant Agency-OS backend endpoint collection, including Workspace, Client, Project, Task, Time Tracking, and Automated Invoice generation.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Workspace (Global)",
+      "item": [
+        {
+          "name": "Register Workspace",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sharkawy Design Agency\",\n  \"contactEmail\": \"billing@sharkawy.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces"
+              ]
+            },
+            "description": "Registers a new tenant workspace globally. Returns the tenantSlug (e.g. tenant_sharkawy_design_agency)."
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Workspaces",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces"
+              ]
+            },
+            "description": "Retrieves all workspaces that the currently logged-in user belongs to."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Workspace",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Sharkawy Design Agency Updated\",\n  \"contactEmail\": \"billing-new@sharkawy.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces",
+                ":tenantId"
+              ],
+              "variable": [
+                {
+                  "key": "tenantId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Updates a workspace's details by its tenantId slug."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Workspace",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces",
+                ":tenantId"
+              ],
+              "variable": [
+                {
+                  "key": "tenantId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Deletes a workspace by its tenantId slug."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Clients",
+      "item": [
+        {
+          "name": "Create Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"email\": \"billing@acme.com\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Clients",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Client By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Client",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Corp Revised\",\n  \"email\": \"billing-new@acme.com\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Client",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Projects",
+      "item": [
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mobile Application Phase 1\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 12000.00,\n  \"status\": \"PLANNING\",\n  \"billingRate\": 125.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "projects"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "projects"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Project By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "projects",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Projects By Client ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/client/:clientId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "projects",
+                "client",
+                ":clientId"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mobile Application Phase 1 - Updated\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 15000.00,\n  \"status\": \"IN_PROGRESS\",\n  \"billingRate\": 130.00\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "projects",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/projects/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "projects",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Tasks",
+      "item": [
+        {
+          "name": "Create Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Implement Authentication Flow\",\n  \"description\": \"Integrate Keycloak OAuth2 flow inside the Spring Boot resource server and secure communication paths.\",\n  \"startDate\": \"2026-08-10T09:00:00Z\",\n  \"dueDate\": \"2026-08-15T18:00:00Z\",\n  \"estimatedMinutes\": 480,\n  \"priority\": \"HIGH\",\n  \"status\": \"IN_PROGRESS\",\n  \"projectId\": \"{{projectId}}\",\n  \"assigneeIds\": [\n    \"7f86adf9-d165-45db-8305-1c263f6846ce\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Tasks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tasks"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Task By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tasks",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Tasks By Project ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks/project/:projectId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tasks",
+                "project",
+                ":projectId"
+              ],
+              "variable": [
+                {
+                  "key": "projectId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Tasks By Assignee ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks/assignee/:assigneeId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tasks",
+                "assignee",
+                ":assigneeId"
+              ],
+              "variable": [
+                {
+                  "key": "assigneeId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Task",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Implement Authentication Flow (Refactored)\",\n  \"description\": \"Include WebSockets STOMP connection security checks in the channel interceptors.\",\n  \"startDate\": \"2026-08-10T09:00:00Z\",\n  \"dueDate\": \"2026-08-16T18:00:00Z\",\n  \"estimatedMinutes\": 600,\n  \"priority\": \"URGENT\",\n  \"status\": \"IN_PROGRESS\",\n  \"projectId\": \"{{projectId}}\",\n  \"assigneeIds\": [\n    \"7f86adf9-d165-45db-8305-1c263f6846ce\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tasks",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Task",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tasks",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Time Tracking (Stopwatch & Logs)",
+      "item": [
+        {
+          "name": "Log Time Manually",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"taskId\": \"{{taskId}}\",\n  \"durationMinutes\": 120,\n  \"isBillable\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Start Stopwatch",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries/start/:taskId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries",
+                "start",
+                ":taskId"
+              ],
+              "variable": [
+                {
+                  "key": "taskId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Stop Stopwatch",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries/stop?isBillable=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries",
+                "stop"
+              ],
+              "query": [
+                {
+                  "key": "isBillable",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Running Active Timer",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries",
+                "active"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Time Entries By Task ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries/task/:taskId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries",
+                "task",
+                ":taskId"
+              ],
+              "variable": [
+                {
+                  "key": "taskId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Time Entries By User ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries/user/:userId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries",
+                "user",
+                ":userId"
+              ],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Time Entry",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Invoices",
+      "item": [
+        {
+          "name": "Auto-Generate Invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"status\": \"DRAFT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invoices"
+              ]
+            },
+            "description": "Pulls all unbilled billable time entries for the client, calculates invoice total using project rates, locks entries, and saves invoice."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Invoices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invoices"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Invoice By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invoices",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Invoices By Client ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/client/:clientId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invoices",
+                "client",
+                ":clientId"
+              ],
+              "variable": [
+                {
+                  "key": "clientId",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Invoice Status/Client",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"status\": \"SENT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invoices",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Invoice",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invoices",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Deletes the invoice. The database will automatically set the linked time entries' invoice_id back to NULL, unlocking them for billing again."
+          },
+          "response": []
+        },
+        {
+          "name": "Download PDF Invoice",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/invoices/:id/pdf",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "invoices",
+                ":id",
+                "pdf"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Returns raw PDF byte stream with inline content disposition. Postman can render this PDF directly in the response viewer."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "accessToken",
+        "value": "{{token}}",
+        "type": "string"
+      },
+      {
+        "key": "addTokenTo",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Set global variable for null byte termination required for manual STOMP frames",
+          "pm.globals.set(\"NULL_CHAR\", \"\\0\");"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "your-keycloak-token-here",
+      "type": "string"
+    },
+    {
+      "key": "tenantId",
+      "value": "tenant_contact_2148d8",
+      "type": "string"
+    },
+    {
+      "key": "clientId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "projectId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

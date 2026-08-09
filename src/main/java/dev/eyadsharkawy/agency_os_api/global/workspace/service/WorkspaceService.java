@@ -40,6 +40,7 @@ public class WorkspaceService {
         Workspace workspace = new Workspace();
         workspace.setName(request.name());
         workspace.setTenantId(tenantId);
+        workspace.setContactEmail(request.contactEmail());
 
         user.getWorkspaces().add(workspace);
 
@@ -79,6 +80,7 @@ public class WorkspaceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Workspace not found with tenant id: " + tenantId));
 
         workspace.setName(workspaceRequest.name());
+        workspace.setContactEmail(workspaceRequest.contactEmail());
 
         Workspace savedWorkspace = workspaceRepository.save(workspace);
         return WorkspaceResponse.fromEntity(savedWorkspace);

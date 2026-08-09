@@ -13,6 +13,7 @@ public record ProjectResponse(
         BigDecimal budget,
         ProjectStatus status,
         UUID clientId,
+        BigDecimal billingRate,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -23,6 +24,7 @@ public record ProjectResponse(
                 project.getBudget(),
                 project.getStatus(),
                 project.getClient().getId(),
+                project.getBillingRate(),
                 project.getCreatedAt(),
                 project.getUpdatedAt()
         );

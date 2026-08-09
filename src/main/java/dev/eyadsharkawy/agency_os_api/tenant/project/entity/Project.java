@@ -32,6 +32,9 @@ public class Project extends BaseEntity {
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
 
+    @Column(name = "billing_rate", nullable = false)
+    private BigDecimal billingRate = BigDecimal.valueOf(100.00);
+
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 }

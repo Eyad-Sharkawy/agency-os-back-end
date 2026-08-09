@@ -33,6 +33,7 @@ public class ProjectService {
         project.setBudget(request.budget());
         project.setStatus(request.status());
         project.setClient(client);
+        project.setBillingRate(request.billingRate());
 
         Project savedProject = projectRepository.save(project);
         return ProjectResponse.fromEntity(savedProject);
@@ -85,6 +86,7 @@ public class ProjectService {
         project.setName(request.name());
         project.setBudget(request.budget());
         project.setStatus(request.status());
+        project.setBillingRate(request.billingRate());
 
         return ProjectResponse.fromEntity(project);
     }

@@ -17,4 +17,9 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, UUID> {
 
     @Query("SELECT COALESCE(SUM(t.durationMinutes), 0) FROM TimeEntry t WHERE t.task.id = :taskId")
     int sumDurationMinutesByTaskId(@Param("taskId") UUID taskId);
+
+    @Query("SELECT t FROM TimeEntry t WHERE t.task.project.client.id = :clientId AND t.isBillable = true AND t.invoice IS NULL")
+    List<TimeEntry> findUnbilledBillableEntriesByClientId(@Param("clientId") UUID clientId);
+
+    List<TimeEntry> findByInvoiceId(UUID invoiceId);
 }

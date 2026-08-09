@@ -2,12 +2,13 @@
 
 CREATE TABLE workspaces
 (
-    id         UUID PRIMARY KEY,
-    name       VARCHAR(255)             NOT NULL,
-    tenant_id  VARCHAR(255)             NOT NULL UNIQUE,
-    is_active  BOOLEAN                  NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+    id            UUID PRIMARY KEY,
+    name          VARCHAR(255)             NOT NULL,
+    tenant_id     VARCHAR(255)             NOT NULL UNIQUE,
+    contact_email VARCHAR(255)             NOT NULL,
+    is_active     BOOLEAN                  NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at    TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
 CREATE TABLE app_users

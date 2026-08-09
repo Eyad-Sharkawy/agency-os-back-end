@@ -9,6 +9,7 @@ public record WorkspaceResponse(
         UUID id,
         String name,
         String tenantId,
+        String contactEmail,
         boolean isActive,
         Instant createdAt,
         Instant updatedAt
@@ -18,6 +19,7 @@ public record WorkspaceResponse(
                 workspace.getId(),
                 workspace.getName(),
                 workspace.getTenantId(),
+                workspace.getContactEmail(),
                 workspace.isActive(),
                 workspace.getCreatedAt(),
                 workspace.getUpdatedAt()
