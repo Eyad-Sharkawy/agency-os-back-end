@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  agency-os-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agency-os-api
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    networks:
+      - agency-os-net
+
+networks:
+  agency-os-net:
+    external: true

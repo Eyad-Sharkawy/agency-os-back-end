@@ -15,16 +15,16 @@ import org.hibernate.annotations.SQLRestriction;
 @SQLRestriction("is_active = true")
 public class Client extends BaseEntity {
 
-    @Column(name = "name", nullable = false)
-    private String name;
+  @Column(name = "name", nullable = false)
+  private String name;
 
-    @Column(name = "email")
-    private String email;
+  @Column(name = "email")
+  private String email;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private ClientStatus status = ClientStatus.PROSPECT;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "status", nullable = false)
+  private ClientStatus status = ClientStatus.PROSPECT;
 
-    @Column(name = "is_active", nullable = false)
-    private boolean isActive = true;
+  @Column(name = "is_active", nullable = false)
+  private boolean isActive = true;
 }

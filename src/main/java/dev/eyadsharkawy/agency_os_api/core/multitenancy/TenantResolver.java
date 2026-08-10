@@ -6,18 +6,17 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class TenantResolver implements CurrentTenantIdentifierResolver<String> {
-    public static final String DEFAULT_TENANT = "public";
+  public static final String DEFAULT_TENANT = "public";
 
-    @Override
-    @NotNull
-    public String resolveCurrentTenantIdentifier() {
-        String tenantId = TenantContextHolder.getTenantId();
-        return tenantId != null ? tenantId : DEFAULT_TENANT;
-    }
+  @Override
+  @NotNull
+  public String resolveCurrentTenantIdentifier() {
+    String tenantId = TenantContextHolder.getTenantId();
+    return tenantId != null ? tenantId : DEFAULT_TENANT;
+  }
 
-    @Override
-    public boolean validateExistingCurrentSessions() {
-        return true;
-    }
-
+  @Override
+  public boolean validateExistingCurrentSessions() {
+    return true;
+  }
 }

@@ -2,6 +2,7 @@ package dev.eyadsharkawy.agency_os_api.core.config;
 
 import dev.eyadsharkawy.agency_os_api.core.exceptions.CustomStompErrorHandler;
 import dev.eyadsharkawy.agency_os_api.core.security.WebSocketAuthChannelInterceptor;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -11,36 +12,36 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
-import java.util.List;
-
 @Configuration
 @EnableWebSocketMessageBroker
 @RequiredArgsConstructor // <-- Add this
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    private final WebSocketAuthChannelInterceptor authChannelInterceptor; // <-- Inject this
-    private final CustomStompErrorHandler stompErrorHandler;
-    @Value("${app.cors.allowed-origins}")
-    private List<String> allowedOrigins;
+  private final WebSocketAuthChannelInterceptor authChannelInterceptor; // <-- Inject this
+  private final CustomStompErrorHandler stompErrorHandler;
 
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/topic", "/queue");
-        config.setApplicationDestinationPrefixes("/app");
-        config.setUserDestinationPrefix("/user");
-    }
+  @Value("${app.cors.allowed-origins}")
+  private List<String> allowedOrigins;
 
-    @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/ws-timer")
-                .setAllowedOriginPatterns(allowedOrigins.toArray(new String[0]))
-                .withSockJS();
+  @Override
+  public void configureMessageBroker(MessageBrokerRegistry config) {
+    config.enableSimpleBroker("/topic", "/queue");
+    config.setApplicationDestinationPrefixes("/app");
+    config.setUserDestinationPrefix("/user");
+  }
 
-        registry.setErrorHandler(stompErrorHandler);
-    }
+  @Override
+  public void registerStompEndpoints(StompEndpointRegistry registry) {
+    registry
+        .addEndpoint("/ws-timer")
+        .setAllowedOriginPatterns(allowedOrigins.toArray(new String[0]))
+        .withSockJS();
 
-    @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(authChannelInterceptor);
-    }
+    registry.setErrorHandler(stompErrorHandler);
+  }
+
+  @Override
+  public void configureClientInboundChannel(ChannelRegistration registration) {
+    registration.interceptors(authChannelInterceptor);
+  }
 }

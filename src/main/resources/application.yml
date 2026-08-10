@@ -3,8 +3,6 @@ spring:
     import: optional:file:.env[.properties]
   application:
     name: agency-os-api
-  mvc:
-    throw-exception-if-no-handler-found: true
   web:
     resources:
       add-mappings: false
@@ -48,7 +46,8 @@ server:
 
 logging:
   level:
-    org.hibernate.SQL: DEBUG
+    root: INFO
+    org.hibernate.SQL: WARN
 
 springdoc:
   api-docs:
@@ -61,3 +60,13 @@ springdoc:
     oauth:
       clientId: ${KEYCLOAK_FRONTEND_CLIENT_ID:agency-os-frontend}
       usePkceWithAuthorizationCodeGrant: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG

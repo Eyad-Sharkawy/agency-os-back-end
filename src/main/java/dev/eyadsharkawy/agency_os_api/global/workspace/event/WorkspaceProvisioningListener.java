@@ -12,14 +12,17 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class WorkspaceProvisioningListener {
 
-    private final TenantSchemaProvisioningService schemaService;
+  private final TenantSchemaProvisioningService schemaService;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
-        try {
-            schemaService.createAndMigrateTenantSchema(event.tenantId());
-        } catch (Exception e) {
-            log.error("Schema provisioning failed for tenant [{}] — workspace row exists without a backing schema", event.tenantId(), e);
-        }
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
+    try {
+      schemaService.createAndMigrateTenantSchema(event.tenantId());
+    } catch (Exception e) {
+      log.error(
+          "Schema provisioning failed for tenant [{}] — workspace row exists without a backing schema",
+          event.tenantId(),
+          e);
     }
+  }
 }

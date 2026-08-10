@@ -14,6 +14,11 @@ import dev.eyadsharkawy.agency_os_api.tenant.invoice.entity.Invoice;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.repository.InvoiceRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.entity.TimeEntry;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.repository.TimeEntryRepository;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
@@ -22,179 +27,187 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.List;
-import java.util.UUID;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
 
-    private final InvoiceRepository invoiceRepository;
-    private final ClientRepository clientRepository;
-    private final WorkspaceRepository workspaceRepository;
-    private final TimeEntryRepository timeEntryRepository;
-    private final ClientUserRepository clientUserRepository;
-    private final UserWorkspaceRepository userWorkspaceRepository;
+  private final InvoiceRepository invoiceRepository;
+  private final ClientRepository clientRepository;
+  private final WorkspaceRepository workspaceRepository;
+  private final TimeEntryRepository timeEntryRepository;
+  private final ClientUserRepository clientUserRepository;
+  private final UserWorkspaceRepository userWorkspaceRepository;
 
-    @Transactional
-    public InvoiceResponse createInvoice(InvoiceRequest request) {
-        log.info("Auto-generating invoice for client [{}]", request.clientId());
+  @Transactional
+  public InvoiceResponse createInvoice(InvoiceRequest request) {
+    log.info("Auto-generating invoice for client [{}]", request.clientId());
 
-        Client client = findClientByIdOrThrow(request.clientId());
+    Client client = findClientByIdOrThrow(request.clientId());
 
-        List<TimeEntry> unbilledEntries = timeEntryRepository.findUnbilledBillableEntriesByClientId(request.clientId());
+    List<TimeEntry> unbilledEntries =
+        timeEntryRepository.findUnbilledBillableEntriesByClientId(request.clientId());
 
-        if (unbilledEntries.isEmpty()) {
-            throw new IllegalArgumentException("No uninvoiced billable time entries found for client: " + client.getName());
+    if (unbilledEntries.isEmpty()) {
+      throw new IllegalArgumentException(
+          "No uninvoiced billable time entries found for client: " + client.getName());
+    }
+
+    BigDecimal totalAmount = BigDecimal.ZERO;
+
+    for (TimeEntry entry : unbilledEntries) {
+      BigDecimal hours =
+          BigDecimal.valueOf(entry.getDurationMinutes())
+              .divide(BigDecimal.valueOf(60.0), 4, RoundingMode.HALF_UP);
+      BigDecimal billingRate = entry.getTask().getProject().getBillingRate();
+      BigDecimal entryCost = hours.multiply(billingRate);
+
+      totalAmount = totalAmount.add(entryCost);
+    }
+
+    Invoice invoice = new Invoice();
+    invoice.setClient(client);
+    invoice.setStatus(request.status());
+    invoice.setTotalAmount(totalAmount.setScale(2, RoundingMode.HALF_UP));
+    Invoice savedInvoice = invoiceRepository.save(invoice);
+
+    for (TimeEntry entry : unbilledEntries) {
+      entry.setInvoice(savedInvoice);
+      timeEntryRepository.save(entry);
+    }
+
+    return InvoiceResponse.fromEntity(savedInvoice);
+  }
+
+  @Transactional(readOnly = true)
+  public List<InvoiceResponse> getAllInvoices() {
+    log.info("Fetching invoices");
+
+    var authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+      String keycloakId = jwt.getSubject();
+      String tenantId = TenantContextHolder.getTenantId();
+
+      var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
+        var clientUserOpt = clientUserRepository.findById(keycloakId);
+        if (clientUserOpt.isPresent()) {
+          UUID clientId = clientUserOpt.get().getClient().getId();
+          log.info(
+              "Client portal user [{}] queried invoices. Filtering for client [{}]",
+              keycloakId,
+              clientId);
+          return invoiceRepository.findByClientId(clientId).stream()
+              .map(InvoiceResponse::fromEntity)
+              .toList();
         }
+        return List.of();
+      }
+    }
 
-        BigDecimal totalAmount = BigDecimal.ZERO;
+    return invoiceRepository.findAll().stream().map(InvoiceResponse::fromEntity).toList();
+  }
 
-        for (TimeEntry entry : unbilledEntries) {
-            BigDecimal hours = BigDecimal.valueOf(entry.getDurationMinutes())
-                    .divide(BigDecimal.valueOf(60.0), 4, RoundingMode.HALF_UP);
-            BigDecimal billingRate = entry.getTask().getProject().getBillingRate();
-            BigDecimal entryCost = hours.multiply(billingRate);
+  @Transactional(readOnly = true)
+  public InvoiceResponse getInvoiceById(UUID id) {
+    log.info("Fetching invoice with id: {}", id);
+    Invoice invoice = findInvoiceByIdOrThrow(id);
 
-            totalAmount = totalAmount.add(entryCost);
+    validateClientAccessToInvoice(invoice);
+
+    return InvoiceResponse.fromEntity(invoice);
+  }
+
+  @Transactional(readOnly = true)
+  public List<InvoiceResponse> getInvoicesByClientId(UUID clientId) {
+    log.info("Fetching invoices for client: {}", clientId);
+    if (!clientRepository.existsById(clientId)) {
+      throw new ResourceNotFoundException("Client not found with id: " + clientId);
+    }
+    return invoiceRepository.findByClientId(clientId).stream()
+        .map(InvoiceResponse::fromEntity)
+        .toList();
+  }
+
+  @Transactional
+  public InvoiceResponse updateInvoiceById(UUID id, InvoiceRequest request) {
+    log.info("Updating invoice status/client for id: {}", id);
+    Invoice invoice = findInvoiceByIdOrThrow(id);
+
+    Client client = invoice.getClient();
+
+    if (!client.getId().equals(request.clientId())) {
+      client = findClientByIdOrThrow(request.clientId());
+    }
+
+    invoice.setClient(client);
+    invoice.setStatus(request.status());
+    Invoice updatedInvoice = invoiceRepository.save(invoice);
+    return InvoiceResponse.fromEntity(updatedInvoice);
+  }
+
+  @Transactional
+  public void deleteInvoiceById(UUID id) {
+    log.info("Deleting invoice with id: {}", id);
+    Invoice invoice = findInvoiceByIdOrThrow(id);
+    invoiceRepository.delete(invoice);
+  }
+
+  @Transactional(readOnly = true)
+  public byte[] generateInvoicePdf(UUID id) {
+    log.info("Generating PDF for invoice: {}", id);
+    Invoice invoice = findInvoiceByIdOrThrow(id);
+
+    validateClientAccessToInvoice(invoice);
+
+    String tenantId = TenantContextHolder.getTenantId();
+    var workspaceOpt = workspaceRepository.findByTenantId(tenantId);
+    String agencyName =
+        workspaceOpt
+            .map(dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace::getName)
+            .orElse("Agency OS Partner");
+    String contactEmail =
+        workspaceOpt
+            .map(dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace::getContactEmail)
+            .orElse("billing@agency.com");
+
+    List<TimeEntry> billedEntries = timeEntryRepository.findByInvoiceId(invoice.getId());
+
+    try {
+      return InvoicePdfGenerator.generate(invoice, agencyName, contactEmail, billedEntries);
+    } catch (IOException e) {
+      log.error("Failed to generate PDF invoice", e);
+      throw new RuntimeException("Error rendering PDF", e);
+    }
+  }
+
+  private void validateClientAccessToInvoice(Invoice invoice) {
+    var authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+      String keycloakId = jwt.getSubject();
+      String tenantId = TenantContextHolder.getTenantId();
+
+      var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
+        var clientUserOpt = clientUserRepository.findById(keycloakId);
+        if (clientUserOpt.isEmpty()
+            || !clientUserOpt.get().getClient().getId().equals(invoice.getClient().getId())) {
+          throw new AccessDeniedException(
+              "Access Denied: You are not authorized to view this invoice.");
         }
-
-        Invoice invoice = new Invoice();
-        invoice.setClient(client);
-        invoice.setStatus(request.status());
-        invoice.setTotalAmount(totalAmount.setScale(2, RoundingMode.HALF_UP));
-        Invoice savedInvoice = invoiceRepository.save(invoice);
-
-        for (TimeEntry entry : unbilledEntries) {
-            entry.setInvoice(savedInvoice);
-            timeEntryRepository.save(entry);
-        }
-
-        return InvoiceResponse.fromEntity(savedInvoice);
+      }
     }
+  }
 
-    @Transactional(readOnly = true)
-    public List<InvoiceResponse> getAllInvoices() {
-        log.info("Fetching invoices");
+  private Invoice findInvoiceByIdOrThrow(UUID id) {
+    return invoiceRepository
+        .findById(id)
+        .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with id: " + id));
+  }
 
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
-            String keycloakId = jwt.getSubject();
-            String tenantId = TenantContextHolder.getTenantId();
-
-            var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-            if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
-                var clientUserOpt = clientUserRepository.findById(keycloakId);
-                if (clientUserOpt.isPresent()) {
-                    UUID clientId = clientUserOpt.get().getClient().getId();
-                    log.info("Client portal user [{}] queried invoices. Filtering for client [{}]", keycloakId, clientId);
-                    return invoiceRepository.findByClientId(clientId).stream()
-                            .map(InvoiceResponse::fromEntity)
-                            .toList();
-                }
-                return List.of();
-            }
-        }
-
-        return invoiceRepository.findAll().stream()
-                .map(InvoiceResponse::fromEntity)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public InvoiceResponse getInvoiceById(UUID id) {
-        log.info("Fetching invoice with id: {}", id);
-        Invoice invoice = findInvoiceByIdOrThrow(id);
-
-        validateClientAccessToInvoice(invoice);
-
-        return InvoiceResponse.fromEntity(invoice);
-    }
-
-    @Transactional(readOnly = true)
-    public List<InvoiceResponse> getInvoicesByClientId(UUID clientId) {
-        log.info("Fetching invoices for client: {}", clientId);
-        if (!clientRepository.existsById(clientId)) {
-            throw new ResourceNotFoundException("Client not found with id: " + clientId);
-        }
-        return invoiceRepository.findByClientId(clientId).stream()
-                .map(InvoiceResponse::fromEntity)
-                .toList();
-    }
-
-    @Transactional
-    public InvoiceResponse updateInvoiceById(UUID id, InvoiceRequest request) {
-        log.info("Updating invoice status/client for id: {}", id);
-        Invoice invoice = findInvoiceByIdOrThrow(id);
-
-        Client client = invoice.getClient();
-
-        if (!client.getId().equals(request.clientId())) {
-            client = findClientByIdOrThrow(request.clientId());
-        }
-
-        invoice.setClient(client);
-        invoice.setStatus(request.status());
-        Invoice updatedInvoice = invoiceRepository.save(invoice);
-        return InvoiceResponse.fromEntity(updatedInvoice);
-    }
-
-    @Transactional
-    public void deleteInvoiceById(UUID id) {
-        log.info("Deleting invoice with id: {}", id);
-        Invoice invoice = findInvoiceByIdOrThrow(id);
-        invoiceRepository.delete(invoice);
-    }
-
-    @Transactional(readOnly = true)
-    public byte[] generateInvoicePdf(UUID id) {
-        log.info("Generating PDF for invoice: {}", id);
-        Invoice invoice = findInvoiceByIdOrThrow(id);
-
-        validateClientAccessToInvoice(invoice);
-
-        String tenantId = TenantContextHolder.getTenantId();
-        var workspaceOpt = workspaceRepository.findByTenantId(tenantId);
-        String agencyName = workspaceOpt.map(dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace::getName).orElse("Agency OS Partner");
-        String contactEmail = workspaceOpt.map(dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace::getContactEmail).orElse("billing@agency.com");
-
-        List<TimeEntry> billedEntries = timeEntryRepository.findByInvoiceId(invoice.getId());
-
-        try {
-            return InvoicePdfGenerator.generate(invoice, agencyName, contactEmail, billedEntries);
-        } catch (IOException e) {
-            log.error("Failed to generate PDF invoice", e);
-            throw new RuntimeException("Error rendering PDF", e);
-        }
-    }
-
-    private void validateClientAccessToInvoice(Invoice invoice) {
-        var authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
-            String keycloakId = jwt.getSubject();
-            String tenantId = TenantContextHolder.getTenantId();
-
-            var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-            if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
-                var clientUserOpt = clientUserRepository.findById(keycloakId);
-                if (clientUserOpt.isEmpty() || !clientUserOpt.get().getClient().getId().equals(invoice.getClient().getId())) {
-                    throw new AccessDeniedException("Access Denied: You are not authorized to view this invoice.");
-                }
-            }
-        }
-    }
-
-    private Invoice findInvoiceByIdOrThrow(UUID id) {
-        return invoiceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Invoice not found with id: " + id));
-    }
-
-    private Client findClientByIdOrThrow(UUID clientId) {
-        return clientRepository.findById(clientId)
-                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + clientId));
-    }
+  private Client findClientByIdOrThrow(UUID clientId) {
+    return clientRepository
+        .findById(clientId)
+        .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + clientId));
+  }
 }

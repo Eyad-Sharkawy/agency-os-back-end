@@ -10,19 +10,20 @@ import org.springframework.web.socket.messaging.StompSubProtocolErrorHandler;
 @Configuration
 public class CustomStompErrorHandler extends StompSubProtocolErrorHandler {
 
-    @Override
-    public Message<byte[]> handleClientMessageProcessingError(Message<byte[]> clientMessage, Throwable ex) {
-        Throwable cause = ex.getCause();
-        String message = (cause != null) ? cause.getMessage() : ex.getMessage();
+  @Override
+  public Message<byte[]> handleClientMessageProcessingError(
+      Message<byte[]> clientMessage, Throwable ex) {
+    Throwable cause = ex.getCause();
+    String message = (cause != null) ? cause.getMessage() : ex.getMessage();
 
-        return buildErrorMessage(message);
-    }
+    return buildErrorMessage(message);
+  }
 
-    private Message<byte[]> buildErrorMessage(String message) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.ERROR);
-        accessor.setMessage(message);
-        accessor.setLeaveMutable(true);
+  private Message<byte[]> buildErrorMessage(String message) {
+    StompHeaderAccessor accessor = StompHeaderAccessor.create(StompCommand.ERROR);
+    accessor.setMessage(message);
+    accessor.setLeaveMutable(true);
 
-        return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
-    }
+    return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+  }
 }

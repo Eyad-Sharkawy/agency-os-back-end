@@ -11,11 +11,11 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class ClientUser {
-    @Id
-    @Column(name = "user_id", nullable = false)
-    private String userId;
+  @Id
+  @Column(name = "user_id", nullable = false)
+  private String userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "client_id", nullable = false)
-    private Client client;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "client_id", nullable = false)
+  private Client client;
 }

@@ -14,27 +14,27 @@ import lombok.Setter;
 @Table(name = "time_entries")
 public class TimeEntry extends BaseEntity {
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "task_id", nullable = false)
-    private Task task;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "task_id", nullable = false)
+  private Task task;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "invoice_id")
-    private Invoice invoice;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "invoice_id")
+  private Invoice invoice;
 
-    @Column(name = "user_id", nullable = false)
-    private String userId;
+  @Column(name = "user_id", nullable = false)
+  private String userId;
 
-    @Column(name = "duration_minutes", nullable = false)
-    private int durationMinutes;
+  @Column(name = "duration_minutes", nullable = false)
+  private int durationMinutes;
 
-    @Column(name = "is_billable", nullable = false)
-    private boolean isBillable = true;
+  @Column(name = "is_billable", nullable = false)
+  private boolean isBillable = true;
 
-    public void mapFromRequestWithIdAndTask(TimeEntryRequest request, String userId, Task task) {
-        this.task = task;
-        this.userId = userId;
-        durationMinutes = request.durationMinutes();
-        isBillable = request.isBillable();
-    }
+  public void mapFromRequestWithIdAndTask(TimeEntryRequest request, String userId, Task task) {
+    this.task = task;
+    this.userId = userId;
+    durationMinutes = request.durationMinutes();
+    isBillable = request.isBillable();
+  }
 }

@@ -6,8 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class AgencyOsApiApplication {
 
-    public static void main(String[] args) {
-        SpringApplication.run(AgencyOsApiApplication.class, args);
-    }
-
+  public static void main(String[] args) {
+    SpringApplication.run(AgencyOsApiApplication.class, args);
+  }
 }

@@ -1,5 +1,10 @@
 package dev.eyadsharkawy.agency_os_api.tenant.invoice.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
@@ -18,6 +23,11 @@ import dev.eyadsharkawy.agency_os_api.tenant.project.entity.Project;
 import dev.eyadsharkawy.agency_os_api.tenant.task.entity.Task;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.entity.TimeEntry;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.repository.TimeEntryRepository;
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,223 +42,209 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class InvoiceServiceTest {
 
-    @Mock
-    private InvoiceRepository invoiceRepository;
-    @Mock
-    private ClientRepository clientRepository;
-    @Mock
-    private WorkspaceRepository workspaceRepository;
-    @Mock
-    private TimeEntryRepository timeEntryRepository;
-    @Mock
-    private ClientUserRepository clientUserRepository;
-    @Mock
-    private UserWorkspaceRepository userWorkspaceRepository;
+  @Mock private InvoiceRepository invoiceRepository;
+  @Mock private ClientRepository clientRepository;
+  @Mock private WorkspaceRepository workspaceRepository;
+  @Mock private TimeEntryRepository timeEntryRepository;
+  @Mock private ClientUserRepository clientUserRepository;
+  @Mock private UserWorkspaceRepository userWorkspaceRepository;
 
-    @InjectMocks
-    private InvoiceService invoiceService;
+  @InjectMocks private InvoiceService invoiceService;
 
-    private Client client;
-    private Invoice invoice;
-    private Project project;
-    private Task task;
-    private TimeEntry timeEntry;
-    private UUID clientId;
-    private UUID invoiceId;
-    private Jwt jwt;
+  private Client client;
+  private Invoice invoice;
+  private Project project;
+  private Task task;
+  private TimeEntry timeEntry;
+  private UUID clientId;
+  private UUID invoiceId;
+  private Jwt jwt;
 
-    @BeforeEach
-    void setUp() {
-        clientId = UUID.randomUUID();
-        invoiceId = UUID.randomUUID();
+  @BeforeEach
+  void setUp() {
+    clientId = UUID.randomUUID();
+    invoiceId = UUID.randomUUID();
 
-        client = new Client();
-        client.setId(clientId);
-        client.setName("Globex Corp");
-        client.setEmail("billing@globex.com");
+    client = new Client();
+    client.setId(clientId);
+    client.setName("Globex Corp");
+    client.setEmail("billing@globex.com");
 
-        project = new Project();
-        project.setId(UUID.randomUUID());
-        project.setName("App Redesign");
-        project.setClient(client);
-        project.setBillingRate(new BigDecimal("100.00"));
+    project = new Project();
+    project.setId(UUID.randomUUID());
+    project.setName("App Redesign");
+    project.setClient(client);
+    project.setBillingRate(new BigDecimal("100.00"));
 
-        task = new Task();
-        task.setId(UUID.randomUUID());
-        task.setTitle("Setup Auth");
-        task.setProject(project);
+    task = new Task();
+    task.setId(UUID.randomUUID());
+    task.setTitle("Setup Auth");
+    task.setProject(project);
 
-        timeEntry = new TimeEntry();
-        timeEntry.setId(UUID.randomUUID());
-        timeEntry.setTask(task);
-        timeEntry.setDurationMinutes(120); // 2 hours
-        timeEntry.setBillable(true);
+    timeEntry = new TimeEntry();
+    timeEntry.setId(UUID.randomUUID());
+    timeEntry.setTask(task);
+    timeEntry.setDurationMinutes(120); // 2 hours
+    timeEntry.setBillable(true);
 
-        invoice = new Invoice();
-        invoice.setId(invoiceId);
-        invoice.setClient(client);
-        invoice.setStatus(InvoiceStatus.DRAFT);
-        invoice.setTotalAmount(new BigDecimal("200.00"));
-        invoice.setCreatedAt(Instant.now());
+    invoice = new Invoice();
+    invoice.setId(invoiceId);
+    invoice.setClient(client);
+    invoice.setStatus(InvoiceStatus.DRAFT);
+    invoice.setTotalAmount(new BigDecimal("200.00"));
+    invoice.setCreatedAt(Instant.now());
 
-        jwt = mock(Jwt.class);
-        lenient().when(jwt.getSubject()).thenReturn("kc-user-123");
+    jwt = mock(Jwt.class);
+    lenient().when(jwt.getSubject()).thenReturn("kc-user-123");
 
-        TenantContextHolder.setTenantId("tenant_acme");
+    TenantContextHolder.setTenantId("tenant_acme");
+  }
+
+  @AfterEach
+  void tearDown() {
+    SecurityContextHolder.clearContext();
+    TenantContextHolder.clear();
+  }
+
+  private void mockSecurityContext(WorkspaceRole role) {
+    Authentication auth = mock(Authentication.class);
+    when(auth.getPrincipal()).thenReturn(jwt);
+
+    SecurityContext securityContext = mock(SecurityContext.class);
+    when(securityContext.getAuthentication()).thenReturn(auth);
+    SecurityContextHolder.setContext(securityContext);
+
+    if (role != null) {
+      when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-user-123", "tenant_acme"))
+          .thenReturn(Optional.of(role));
     }
+  }
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-        TenantContextHolder.clear();
-    }
+  @Test
+  @DisplayName("createInvoice should throw exception when no unbilled time entries")
+  void createInvoice_NoUnbilledEntries_ThrowsException() {
+    InvoiceRequest request = new InvoiceRequest(clientId, InvoiceStatus.DRAFT);
+    when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
+    when(timeEntryRepository.findUnbilledBillableEntriesByClientId(clientId)).thenReturn(List.of());
 
-    private void mockSecurityContext(WorkspaceRole role) {
-        Authentication auth = mock(Authentication.class);
-        when(auth.getPrincipal()).thenReturn(jwt);
+    assertThatThrownBy(() -> invoiceService.createInvoice(request))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("No uninvoiced billable time entries found");
+  }
 
-        SecurityContext securityContext = mock(SecurityContext.class);
-        when(securityContext.getAuthentication()).thenReturn(auth);
-        SecurityContextHolder.setContext(securityContext);
+  @Test
+  @DisplayName("createInvoice should compute total cost and save invoice successfully")
+  void createInvoice_Success() {
+    InvoiceRequest request = new InvoiceRequest(clientId, InvoiceStatus.DRAFT);
 
-        if (role != null) {
-            when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-user-123", "tenant_acme"))
-                    .thenReturn(Optional.of(role));
-        }
-    }
+    when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
+    when(timeEntryRepository.findUnbilledBillableEntriesByClientId(clientId))
+        .thenReturn(List.of(timeEntry));
+    when(invoiceRepository.save(any(Invoice.class)))
+        .thenAnswer(
+            i -> {
+              Invoice inv = i.getArgument(0);
+              inv.setId(invoiceId);
+              return inv;
+            });
 
-    @Test
-    @DisplayName("createInvoice should throw exception when no unbilled time entries")
-    void createInvoice_NoUnbilledEntries_ThrowsException() {
-        InvoiceRequest request = new InvoiceRequest(clientId, InvoiceStatus.DRAFT);
-        when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
-        when(timeEntryRepository.findUnbilledBillableEntriesByClientId(clientId)).thenReturn(List.of());
+    InvoiceResponse response = invoiceService.createInvoice(request);
 
-        assertThatThrownBy(() -> invoiceService.createInvoice(request))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("No uninvoiced billable time entries found");
-    }
+    assertThat(response).isNotNull();
+    assertThat(response.totalAmount()).isEqualByComparingTo(new BigDecimal("200.00"));
+    verify(timeEntryRepository, times(1)).save(timeEntry);
+    verify(invoiceRepository, times(1)).save(any(Invoice.class));
+  }
 
-    @Test
-    @DisplayName("createInvoice should compute total cost and save invoice successfully")
-    void createInvoice_Success() {
-        InvoiceRequest request = new InvoiceRequest(clientId, InvoiceStatus.DRAFT);
+  @Test
+  @DisplayName("getAllInvoices for CLIENT role should filter by client user company")
+  void getAllInvoices_ClientRole_Filtered() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
 
-        when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
-        when(timeEntryRepository.findUnbilledBillableEntriesByClientId(clientId)).thenReturn(List.of(timeEntry));
-        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(i -> {
-            Invoice inv = i.getArgument(0);
-            inv.setId(invoiceId);
-            return inv;
-        });
+    ClientUser clientUser = new ClientUser();
+    clientUser.setUserId("kc-user-123");
+    clientUser.setClient(client);
 
-        InvoiceResponse response = invoiceService.createInvoice(request);
+    when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.of(clientUser));
+    when(invoiceRepository.findByClientId(clientId)).thenReturn(List.of(invoice));
 
-        assertThat(response).isNotNull();
-        assertThat(response.totalAmount()).isEqualByComparingTo(new BigDecimal("200.00"));
-        verify(timeEntryRepository, times(1)).save(timeEntry);
-        verify(invoiceRepository, times(1)).save(any(Invoice.class));
-    }
+    List<InvoiceResponse> responses = invoiceService.getAllInvoices();
 
-    @Test
-    @DisplayName("getAllInvoices for CLIENT role should filter by client user company")
-    void getAllInvoices_ClientRole_Filtered() {
-        mockSecurityContext(WorkspaceRole.CLIENT);
+    assertThat(responses).hasSize(1);
+    assertThat(responses.get(0).id()).isEqualTo(invoiceId);
+  }
 
-        ClientUser clientUser = new ClientUser();
-        clientUser.setUserId("kc-user-123");
-        clientUser.setClient(client);
+  @Test
+  @DisplayName(
+      "getInvoiceById for CLIENT role should throw AccessDeniedException if client mismatch")
+  void getInvoiceById_ClientMismatch_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
 
-        when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.of(clientUser));
-        when(invoiceRepository.findByClientId(clientId)).thenReturn(List.of(invoice));
+    Client otherClient = new Client();
+    otherClient.setId(UUID.randomUUID());
+    ClientUser clientUser = new ClientUser();
+    clientUser.setClient(otherClient);
 
-        List<InvoiceResponse> responses = invoiceService.getAllInvoices();
+    when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+    when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.of(clientUser));
 
-        assertThat(responses).hasSize(1);
-        assertThat(responses.get(0).id()).isEqualTo(invoiceId);
-    }
+    assertThatThrownBy(() -> invoiceService.getInvoiceById(invoiceId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("not authorized to view this invoice");
+  }
 
-    @Test
-    @DisplayName("getInvoiceById for CLIENT role should throw AccessDeniedException if client mismatch")
-    void getInvoiceById_ClientMismatch_AccessDenied() {
-        mockSecurityContext(WorkspaceRole.CLIENT);
+  @Test
+  @DisplayName("getInvoicesByClientId should return invoices for valid client")
+  void getInvoicesByClientId_Success() {
+    when(clientRepository.existsById(clientId)).thenReturn(true);
+    when(invoiceRepository.findByClientId(clientId)).thenReturn(List.of(invoice));
 
-        Client otherClient = new Client();
-        otherClient.setId(UUID.randomUUID());
-        ClientUser clientUser = new ClientUser();
-        clientUser.setClient(otherClient);
+    List<InvoiceResponse> responses = invoiceService.getInvoicesByClientId(clientId);
 
-        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
-        when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.of(clientUser));
+    assertThat(responses).hasSize(1);
+    assertThat(responses.get(0).id()).isEqualTo(invoiceId);
+  }
 
-        assertThatThrownBy(() -> invoiceService.getInvoiceById(invoiceId))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("not authorized to view this invoice");
-    }
+  @Test
+  @DisplayName("updateInvoiceById should update status and save invoice")
+  void updateInvoiceById_Success() {
+    InvoiceRequest request = new InvoiceRequest(clientId, InvoiceStatus.PAID);
+    when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+    when(invoiceRepository.save(any(Invoice.class))).thenAnswer(i -> i.getArgument(0));
 
-    @Test
-    @DisplayName("getInvoicesByClientId should return invoices for valid client")
-    void getInvoicesByClientId_Success() {
-        when(clientRepository.existsById(clientId)).thenReturn(true);
-        when(invoiceRepository.findByClientId(clientId)).thenReturn(List.of(invoice));
+    InvoiceResponse response = invoiceService.updateInvoiceById(invoiceId, request);
 
-        List<InvoiceResponse> responses = invoiceService.getInvoicesByClientId(clientId);
+    assertThat(response.status()).isEqualTo(InvoiceStatus.PAID);
+    verify(invoiceRepository, times(1)).save(invoice);
+  }
 
-        assertThat(responses).hasSize(1);
-        assertThat(responses.get(0).id()).isEqualTo(invoiceId);
-    }
+  @Test
+  @DisplayName("deleteInvoiceById should delete invoice when found")
+  void deleteInvoiceById_Success() {
+    when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
 
-    @Test
-    @DisplayName("updateInvoiceById should update status and save invoice")
-    void updateInvoiceById_Success() {
-        InvoiceRequest request = new InvoiceRequest(clientId, InvoiceStatus.PAID);
-        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
-        when(invoiceRepository.save(any(Invoice.class))).thenAnswer(i -> i.getArgument(0));
+    invoiceService.deleteInvoiceById(invoiceId);
 
-        InvoiceResponse response = invoiceService.updateInvoiceById(invoiceId, request);
+    verify(invoiceRepository, times(1)).delete(invoice);
+  }
 
-        assertThat(response.status()).isEqualTo(InvoiceStatus.PAID);
-        verify(invoiceRepository, times(1)).save(invoice);
-    }
+  @Test
+  @DisplayName("generateInvoicePdf should generate PDF bytes for invoice")
+  void generateInvoicePdf_Success() {
+    Workspace ws = new Workspace();
+    ws.setName("Acme Agency");
+    ws.setContactEmail("contact@acme.com");
 
-    @Test
-    @DisplayName("deleteInvoiceById should delete invoice when found")
-    void deleteInvoiceById_Success() {
-        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+    when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+    when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(ws));
+    when(timeEntryRepository.findByInvoiceId(invoiceId)).thenReturn(List.of(timeEntry));
 
-        invoiceService.deleteInvoiceById(invoiceId);
+    byte[] pdfBytes = invoiceService.generateInvoicePdf(invoiceId);
 
-        verify(invoiceRepository, times(1)).delete(invoice);
-    }
-
-    @Test
-    @DisplayName("generateInvoicePdf should generate PDF bytes for invoice")
-    void generateInvoicePdf_Success() {
-        Workspace ws = new Workspace();
-        ws.setName("Acme Agency");
-        ws.setContactEmail("contact@acme.com");
-
-        when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
-        when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(ws));
-        when(timeEntryRepository.findByInvoiceId(invoiceId)).thenReturn(List.of(timeEntry));
-
-        byte[] pdfBytes = invoiceService.generateInvoicePdf(invoiceId);
-
-        assertThat(pdfBytes).isNotNull();
-        assertThat(pdfBytes.length).isGreaterThan(0);
-    }
+    assertThat(pdfBytes).isNotNull();
+    assertThat(pdfBytes.length).isGreaterThan(0);
+  }
 }

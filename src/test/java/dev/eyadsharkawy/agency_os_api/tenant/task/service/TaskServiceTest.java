@@ -1,5 +1,10 @@
 package dev.eyadsharkawy.agency_os_api.tenant.task.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
@@ -14,6 +19,11 @@ import dev.eyadsharkawy.agency_os_api.tenant.task.entity.TaskPriority;
 import dev.eyadsharkawy.agency_os_api.tenant.task.entity.TaskStatus;
 import dev.eyadsharkawy.agency_os_api.tenant.task.repository.TaskRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.repository.TimeEntryRepository;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,169 +38,177 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class TaskServiceTest {
 
-    @Mock
-    private TaskRepository taskRepository;
-    @Mock
-    private ProjectRepository projectRepository;
-    @Mock
-    private TimeEntryRepository timeEntryRepository;
-    @Mock
-    private UserWorkspaceRepository userWorkspaceRepository;
+  @Mock private TaskRepository taskRepository;
+  @Mock private ProjectRepository projectRepository;
+  @Mock private TimeEntryRepository timeEntryRepository;
+  @Mock private UserWorkspaceRepository userWorkspaceRepository;
 
-    @InjectMocks
-    private TaskService taskService;
+  @InjectMocks private TaskService taskService;
 
-    private Project project;
-    private Task task;
-    private UUID projectId;
-    private UUID taskId;
-    private Jwt jwt;
+  private Project project;
+  private Task task;
+  private UUID projectId;
+  private UUID taskId;
+  private Jwt jwt;
 
-    @BeforeEach
-    void setUp() {
-        projectId = UUID.randomUUID();
-        taskId = UUID.randomUUID();
+  @BeforeEach
+  void setUp() {
+    projectId = UUID.randomUUID();
+    taskId = UUID.randomUUID();
 
-        project = new Project();
-        project.setId(projectId);
-        project.setName("Project Alpha");
+    project = new Project();
+    project.setId(projectId);
+    project.setName("Project Alpha");
 
-        task = new Task();
-        task.setId(taskId);
-        task.setTitle("Design Mockups");
-        task.setDescription("Create UI components");
-        task.setStatus(TaskStatus.IN_PROGRESS);
-        task.setPriority(TaskPriority.HIGH);
-        task.setProject(project);
-        task.setAssigneeIds(Set.of("kc-user-123"));
+    task = new Task();
+    task.setId(taskId);
+    task.setTitle("Design Mockups");
+    task.setDescription("Create UI components");
+    task.setStatus(TaskStatus.IN_PROGRESS);
+    task.setPriority(TaskPriority.HIGH);
+    task.setProject(project);
+    task.setAssigneeIds(Set.of("kc-user-123"));
 
-        jwt = mock(Jwt.class);
-        lenient().when(jwt.getSubject()).thenReturn("kc-user-123");
+    jwt = mock(Jwt.class);
+    lenient().when(jwt.getSubject()).thenReturn("kc-user-123");
 
-        TenantContextHolder.setTenantId("tenant_acme");
+    TenantContextHolder.setTenantId("tenant_acme");
+  }
+
+  @AfterEach
+  void tearDown() {
+    SecurityContextHolder.clearContext();
+    TenantContextHolder.clear();
+  }
+
+  private void mockSecurityContext(WorkspaceRole role) {
+    Authentication auth = mock(Authentication.class);
+    when(auth.getPrincipal()).thenReturn(jwt);
+
+    SecurityContext securityContext = mock(SecurityContext.class);
+    when(securityContext.getAuthentication()).thenReturn(auth);
+    SecurityContextHolder.setContext(securityContext);
+
+    if (role != null) {
+      when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-user-123", "tenant_acme"))
+          .thenReturn(Optional.of(role));
     }
+  }
 
-    @AfterEach
-    void tearDown() {
-        SecurityContextHolder.clearContext();
-        TenantContextHolder.clear();
-    }
+  @Test
+  @DisplayName("createTask should throw ResourceNotFoundException when project not found")
+  void createTask_ProjectNotFound() {
+    TaskRequest request =
+        new TaskRequest(
+            "Title",
+            "Desc",
+            Instant.now(),
+            Instant.now(),
+            120,
+            TaskPriority.HIGH,
+            TaskStatus.TODO,
+            projectId,
+            Set.of("kc-user-123"));
+    when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
 
-    private void mockSecurityContext(WorkspaceRole role) {
-        Authentication auth = mock(Authentication.class);
-        when(auth.getPrincipal()).thenReturn(jwt);
+    assertThatThrownBy(() -> taskService.createTask(request))
+        .isInstanceOf(ResourceNotFoundException.class);
+  }
 
-        SecurityContext securityContext = mock(SecurityContext.class);
-        when(securityContext.getAuthentication()).thenReturn(auth);
-        SecurityContextHolder.setContext(securityContext);
+  @Test
+  @DisplayName("createTask should save task and return TaskResponse")
+  void createTask_Success() {
+    TaskRequest request =
+        new TaskRequest(
+            "Design Mockups",
+            "Create UI components",
+            Instant.now(),
+            Instant.now(),
+            120,
+            TaskPriority.HIGH,
+            TaskStatus.IN_PROGRESS,
+            projectId,
+            Set.of("kc-user-123"));
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(taskRepository.save(any(Task.class)))
+        .thenAnswer(
+            i -> {
+              Task t = i.getArgument(0);
+              t.setId(taskId);
+              return t;
+            });
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(60);
 
-        if (role != null) {
-            when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-user-123", "tenant_acme"))
-                    .thenReturn(Optional.of(role));
-        }
-    }
+    TaskResponse response = taskService.createTask(request);
 
-    @Test
-    @DisplayName("createTask should throw ResourceNotFoundException when project not found")
-    void createTask_ProjectNotFound() {
-        TaskRequest request = new TaskRequest("Title", "Desc", Instant.now(), Instant.now(), 120, TaskPriority.HIGH, TaskStatus.TODO, projectId, Set.of("kc-user-123"));
-        when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
+    assertThat(response).isNotNull();
+    assertThat(response.title()).isEqualTo("Design Mockups");
+    assertThat(response.totalLoggedMinutes()).isEqualTo(60);
+  }
 
-        assertThatThrownBy(() -> taskService.createTask(request))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
+  @Test
+  @DisplayName("getAllTasks for MEMBER role should filter by assignee")
+  void getAllTasks_MemberRole_Filtered() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+    when(taskRepository.findByAssigneeId("kc-user-123")).thenReturn(List.of(task));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(30);
 
-    @Test
-    @DisplayName("createTask should save task and return TaskResponse")
-    void createTask_Success() {
-        TaskRequest request = new TaskRequest("Design Mockups", "Create UI components", Instant.now(), Instant.now(), 120, TaskPriority.HIGH, TaskStatus.IN_PROGRESS, projectId, Set.of("kc-user-123"));
-        when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-        when(taskRepository.save(any(Task.class))).thenAnswer(i -> {
-            Task t = i.getArgument(0);
-            t.setId(taskId);
-            return t;
-        });
-        when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(60);
+    List<TaskResponse> responses = taskService.getAllTasks();
 
-        TaskResponse response = taskService.createTask(request);
+    assertThat(responses).hasSize(1);
+    assertThat(responses.get(0).id()).isEqualTo(taskId);
+  }
 
-        assertThat(response).isNotNull();
-        assertThat(response.title()).isEqualTo("Design Mockups");
-        assertThat(response.totalLoggedMinutes()).isEqualTo(60);
-    }
+  @Test
+  @DisplayName(
+      "getTaskById for MEMBER role should throw AccessDeniedException if user not assigned")
+  void getTaskById_MemberNotAssigned_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+    task.setAssigneeIds(Set.of("other-user"));
 
-    @Test
-    @DisplayName("getAllTasks for MEMBER role should filter by assignee")
-    void getAllTasks_MemberRole_Filtered() {
-        mockSecurityContext(WorkspaceRole.MEMBER);
-        when(taskRepository.findByAssigneeId("kc-user-123")).thenReturn(List.of(task));
-        when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(30);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
 
-        List<TaskResponse> responses = taskService.getAllTasks();
+    assertThatThrownBy(() -> taskService.getTaskById(taskId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("You are not assigned to this task");
+  }
 
-        assertThat(responses).hasSize(1);
-        assertThat(responses.get(0).id()).isEqualTo(taskId);
-    }
+  @Test
+  @DisplayName(
+      "getTasksByAssigneeId for MEMBER querying another assignee should throw AccessDeniedException")
+  void getTasksByAssigneeId_MemberQueryingOther_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
 
-    @Test
-    @DisplayName("getTaskById for MEMBER role should throw AccessDeniedException if user not assigned")
-    void getTaskById_MemberNotAssigned_AccessDenied() {
-        mockSecurityContext(WorkspaceRole.MEMBER);
-        task.setAssigneeIds(Set.of("other-user"));
+    assertThatThrownBy(() -> taskService.getTasksByAssigneeId("other-user-999"))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("cannot view task assignments of other team members");
+  }
 
-        when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+  @Test
+  @DisplayName("updateTaskStatus should update status successfully")
+  void updateTaskStatus_Success() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+    when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(90);
 
-        assertThatThrownBy(() -> taskService.getTaskById(taskId))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("You are not assigned to this task");
-    }
+    TaskStatusUpdateRequest request = new TaskStatusUpdateRequest(TaskStatus.DONE);
+    TaskResponse response = taskService.updateTaskStatus(taskId, request);
 
-    @Test
-    @DisplayName("getTasksByAssigneeId for MEMBER querying another assignee should throw AccessDeniedException")
-    void getTasksByAssigneeId_MemberQueryingOther_AccessDenied() {
-        mockSecurityContext(WorkspaceRole.MEMBER);
+    assertThat(response.status()).isEqualTo(TaskStatus.DONE);
+    verify(taskRepository, times(1)).save(task);
+  }
 
-        assertThatThrownBy(() -> taskService.getTasksByAssigneeId("other-user-999"))
-                .isInstanceOf(AccessDeniedException.class)
-                .hasMessageContaining("cannot view task assignments of other team members");
-    }
+  @Test
+  @DisplayName("deleteTaskById should delete task when found")
+  void deleteTaskById_Success() {
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
 
-    @Test
-    @DisplayName("updateTaskStatus should update status successfully")
-    void updateTaskStatus_Success() {
-        mockSecurityContext(WorkspaceRole.MEMBER);
-        when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
-        when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
-        when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(90);
+    taskService.deleteTaskById(taskId);
 
-        TaskStatusUpdateRequest request = new TaskStatusUpdateRequest(TaskStatus.DONE);
-        TaskResponse response = taskService.updateTaskStatus(taskId, request);
-
-        assertThat(response.status()).isEqualTo(TaskStatus.DONE);
-        verify(taskRepository, times(1)).save(task);
-    }
-
-    @Test
-    @DisplayName("deleteTaskById should delete task when found")
-    void deleteTaskById_Success() {
-        when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
-
-        taskService.deleteTaskById(taskId);
-
-        verify(taskRepository, times(1)).delete(task);
-    }
+    verify(taskRepository, times(1)).delete(task);
+  }
 }

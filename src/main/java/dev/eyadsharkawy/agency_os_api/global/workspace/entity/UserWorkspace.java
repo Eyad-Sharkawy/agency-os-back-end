@@ -12,20 +12,19 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 public class UserWorkspace {
-    @EmbeddedId
-    private UserWorkspaceId id = new UserWorkspaceId();
+  @EmbeddedId private UserWorkspaceId id = new UserWorkspaceId();
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("userId")
-    @JoinColumn(name = "user_id")
-    private AppUser user;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @MapsId("userId")
+  @JoinColumn(name = "user_id")
+  private AppUser user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("workspaceId")
-    @JoinColumn(name = "workspace_id")
-    private Workspace workspace;
+  @ManyToOne(fetch = FetchType.LAZY)
+  @MapsId("workspaceId")
+  @JoinColumn(name = "workspace_id")
+  private Workspace workspace;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private WorkspaceRole role = WorkspaceRole.MEMBER;
+  @Enumerated(EnumType.STRING)
+  @Column(name = "role", nullable = false)
+  private WorkspaceRole role = WorkspaceRole.MEMBER;
 }
