@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  agency-os-api:
+  agency-os:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agency-os-api
+    container_name: agency-os
     restart: always
     ports:
       - "8080:8080"
