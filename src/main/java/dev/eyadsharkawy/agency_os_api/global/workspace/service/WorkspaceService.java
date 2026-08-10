@@ -55,7 +55,17 @@ public class WorkspaceService {
         Workspace workspace = new Workspace();
         workspace.setName(request.name());
         workspace.setTenantId(tenantId);
-        workspace.setContactEmail(user.getEmail());
+
+        String contactEmail = user.getEmail();
+        if (contactEmail == null || contactEmail.isBlank()) {
+            contactEmail = jwt.getClaimAsString("email");
+            if (contactEmail == null || contactEmail.isBlank()) {
+                contactEmail = user.getUsername() + "@agency.com";
+            }
+            user.setEmail(contactEmail);
+            userRepository.save(user);
+        }
+        workspace.setContactEmail(contactEmail);
 
         workspaceRepository.save(workspace);
 
@@ -235,7 +245,11 @@ public class WorkspaceService {
         AppUser newUser = new AppUser();
         newUser.setKeycloakId(jwt.getSubject());
         newUser.setUsername(jwt.getClaimAsString("preferred_username"));
-        newUser.setEmail(jwt.getClaimAsString("username"));
+        String email = jwt.getClaimAsString("email");
+        if (email == null || email.isBlank()) {
+            email = jwt.getClaimAsString("preferred_username") + "@agency.com";
+        }
+        newUser.setEmail(email);
         newUser.setFirstName(jwt.getClaimAsString("given_name"));
         newUser.setLastName(jwt.getClaimAsString("family_name"));
         return newUser;

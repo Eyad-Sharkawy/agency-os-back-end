@@ -3,6 +3,9 @@ package dev.eyadsharkawy.agency_os_api.tenant.invoice.controller;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.dto.InvoiceRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.dto.InvoiceResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.service.InvoiceService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;
@@ -15,12 +18,14 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/invoices")
 @RequiredArgsConstructor
+@Tag(name = "07. Invoices", description = "Endpoints for auto-generating invoices, updating billing status, listing invoices, and downloading multi-page PDFs")
 public class InvoiceController {
 
     private final InvoiceService invoiceService;
 
     @PostMapping
     @PreAuthorize("@workspaceSecurity.hasRole('OWNER')")
+    @Operation(summary = "Create invoice", description = "Consolidates all unbilled time entries for a client and auto-generates a billing invoice. Restricted strictly to the OWNER.")
     public ResponseEntity<InvoiceResponse> createInvoice(@Valid @RequestBody InvoiceRequest request) {
         InvoiceResponse response = invoiceService.createInvoice(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -28,6 +33,7 @@ public class InvoiceController {
 
     @GetMapping
     @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN', 'CLIENT')")
+    @Operation(summary = "List all invoices", description = "Retrieves all invoices. CLIENT portal contacts only see invoices associated with their company. MEMBERS are completely blocked. Restricted to OWNER, ADMIN, or CLIENT.")
     public ResponseEntity<List<InvoiceResponse>> getAllInvoices() {
         List<InvoiceResponse> responses = invoiceService.getAllInvoices();
         return ResponseEntity.ok(responses);
@@ -35,41 +41,46 @@ public class InvoiceController {
 
     @GetMapping("/{id}")
     @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN', 'CLIENT')")
-    public ResponseEntity<InvoiceResponse> getInvoiceById(@PathVariable UUID id) {
+    @Operation(summary = "Get invoice by ID", description = "Retrieves metadata of a specific invoice. CLIENT portal contacts can only look up their own company invoices. Restricted to OWNER, ADMIN, or CLIENT.")
+    public ResponseEntity<InvoiceResponse> getInvoiceById(
+            @Parameter(description = "The invoice unique ID") @PathVariable UUID id) {
         InvoiceResponse response = invoiceService.getInvoiceById(id);
         return ResponseEntity.ok(response);
     }
 
-    // Owners and Admins can query invoices by client company ID
     @GetMapping("/client/{clientId}")
     @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN')")
-    public ResponseEntity<List<InvoiceResponse>> getInvoicesByClientId(@PathVariable UUID clientId) {
+    @Operation(summary = "Get invoices by Client ID", description = "Lists all invoices generated for a specific client company. Restricted to OWNER or ADMIN.")
+    public ResponseEntity<List<InvoiceResponse>> getInvoicesByClientId(
+            @Parameter(description = "The client company unique ID") @PathVariable UUID clientId) {
         List<InvoiceResponse> responses = invoiceService.getInvoicesByClientId(clientId);
         return ResponseEntity.ok(responses);
     }
 
-    // Only OWNER can update invoices
     @PutMapping("/{id}")
     @PreAuthorize("@workspaceSecurity.hasRole('OWNER')")
+    @Operation(summary = "Update invoice", description = "Modifies an invoice's status or details. Restricted strictly to the OWNER.")
     public ResponseEntity<InvoiceResponse> updateInvoice(
-            @PathVariable UUID id,
+            @Parameter(description = "The invoice unique ID") @PathVariable UUID id,
             @Valid @RequestBody InvoiceRequest request) {
         InvoiceResponse response = invoiceService.updateInvoiceById(id, request);
         return ResponseEntity.ok(response);
     }
 
-    // Only OWNER can delete invoices
     @DeleteMapping("/{id}")
     @PreAuthorize("@workspaceSecurity.hasRole('OWNER')")
-    public ResponseEntity<Void> deleteInvoice(@PathVariable UUID id) {
+    @Operation(summary = "Delete invoice", description = "Permanently deletes an invoice and returns all billed time entries back to 'unbilled' status. Restricted strictly to the OWNER.")
+    public ResponseEntity<Void> deleteInvoice(
+            @Parameter(description = "The invoice unique ID") @PathVariable UUID id) {
         invoiceService.deleteInvoiceById(id);
         return ResponseEntity.noContent().build();
     }
 
-    // Owners, Admins, and Clients can download the invoice PDF (with Client ID checks inside the service layer)
     @GetMapping("/{id}/pdf")
     @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN', 'CLIENT')")
-    public ResponseEntity<byte[]> downloadInvoicePdf(@PathVariable UUID id) {
+    @Operation(summary = "Download invoice PDF document", description = "Renders and outputs a print-ready multi-page PDF document containing breakdown metrics, logo, and payment instructions. CLIENT users can only download their own invoice PDFs.")
+    public ResponseEntity<byte[]> downloadInvoicePdf(
+            @Parameter(description = "The invoice unique ID") @PathVariable UUID id) {
         byte[] pdfBytes = invoiceService.generateInvoicePdf(id);
 
         HttpHeaders headers = new HttpHeaders();

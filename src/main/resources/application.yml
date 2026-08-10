@@ -49,3 +49,15 @@ server:
 logging:
   level:
     org.hibernate.SQL: DEBUG
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    operationsSorter: method
+    tagsSorter: alpha
+    display-request-duration: true
+    document-title: Agency OS API
+    oauth:
+      clientId: ${KEYCLOAK_FRONTEND_CLIENT_ID:agency-os-frontend}
+      usePkceWithAuthorizationCodeGrant: true

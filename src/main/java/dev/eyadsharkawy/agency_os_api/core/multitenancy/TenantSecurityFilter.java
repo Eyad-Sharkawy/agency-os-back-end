@@ -33,7 +33,10 @@ public class TenantSecurityFilter extends OncePerRequestFilter {
     private static final List<String> GLOBAL_ENDPOINTS = List.of(
             "/api/v1/workspaces",
             "/error",
-            "/ws-timer"
+            "/ws-timer",
+            "/v3/api-docs",
+            "/api-docs",
+            "/swagger-ui"
     );
 
     private final ObjectMapper objectMapper;
@@ -51,7 +54,10 @@ public class TenantSecurityFilter extends OncePerRequestFilter {
             return;
         }
 
-        boolean isGlobalEndpoint = GLOBAL_ENDPOINTS.stream().anyMatch(requestURI::startsWith);
+        boolean isGlobalEndpoint = GLOBAL_ENDPOINTS.stream().anyMatch(requestURI::startsWith)
+                || requestURI.equals("/")
+                || requestURI.equals("/favicon.ico")
+                || requestURI.equals("/swagger-ui.html");
         if (isGlobalEndpoint) {
             filterChain.doFilter(request, response);
             return;

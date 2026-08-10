@@ -20,8 +20,8 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, UUID> {
     @Query("""
                 SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END
                 FROM Workspace w
-                JOIN w.users u
-                WHERE u.keycloakId = :keycloakId
+                JOIN w.userWorkspaces uw
+                WHERE uw.user.keycloakId = :keycloakId
                   AND w.tenantId = :tenantId
                   AND w.isActive = true
             """)
