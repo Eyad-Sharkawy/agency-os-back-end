@@ -4,19 +4,9 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
-import io.swagger.v3.oas.models.security.OAuthFlow;
-import io.swagger.v3.oas.models.security.OAuthFlows;
-import io.swagger.v3.oas.models.security.Scopes;
-import io.swagger.v3.oas.models.security.SecurityRequirement;
-import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.security.*;
 import io.swagger.v3.oas.models.tags.Tag;
 import org.springdoc.core.customizers.OpenApiCustomizer;
-import org.springdoc.core.properties.SwaggerUiConfigProperties;
-import org.springdoc.core.properties.SwaggerUiOAuthProperties;
-import org.springdoc.core.providers.ObjectMapperProvider;
-import org.springdoc.webmvc.ui.SwaggerIndexPageTransformer;
-import org.springdoc.webmvc.ui.SwaggerIndexTransformer;
-import org.springdoc.webmvc.ui.SwaggerWelcomeCommon;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -92,30 +82,30 @@ public class OpenApiConfig {
             if (paths != null) {
                 Paths sortedPaths = new Paths();
                 paths.entrySet().stream()
-                    .sorted((entry1, entry2) -> {
-                        String p1 = entry1.getKey();
-                        String p2 = entry2.getKey();
+                        .sorted((entry1, entry2) -> {
+                            String p1 = entry1.getKey();
+                            String p2 = entry2.getKey();
 
-                        String[] s1 = p1.split("/");
-                        String[] s2 = p2.split("/");
+                            String[] s1 = p1.split("/");
+                            String[] s2 = p2.split("/");
 
-                        int minLen = Math.min(s1.length, s2.length);
-                        for (int i = 0; i < minLen; i++) {
-                            boolean isParam1 = s1[i].startsWith("{");
-                            boolean isParam2 = s2[i].startsWith("{");
+                            int minLen = Math.min(s1.length, s2.length);
+                            for (int i = 0; i < minLen; i++) {
+                                boolean isParam1 = s1[i].startsWith("{");
+                                boolean isParam2 = s2[i].startsWith("{");
 
-                            if (isParam1 != isParam2) {
-                                return isParam1 ? 1 : -1;
+                                if (isParam1 != isParam2) {
+                                    return isParam1 ? 1 : -1;
+                                }
+
+                                int comp = s1[i].compareTo(s2[i]);
+                                if (comp != 0) {
+                                    return comp;
+                                }
                             }
-
-                            int comp = s1[i].compareTo(s2[i]);
-                            if (comp != 0) {
-                                return comp;
-                            }
-                        }
-                        return Integer.compare(s1.length, s2.length);
-                    })
-                    .forEach(entry -> sortedPaths.put(entry.getKey(), entry.getValue()));
+                            return Integer.compare(s1.length, s2.length);
+                        })
+                        .forEach(entry -> sortedPaths.put(entry.getKey(), entry.getValue()));
                 openApi.setPaths(sortedPaths);
             }
 
@@ -125,8 +115,8 @@ public class OpenApiConfig {
                 Map<String, io.swagger.v3.oas.models.media.Schema> sortedSchemas = new LinkedHashMap<>();
 
                 schemas.entrySet().stream()
-                    .sorted(Map.Entry.comparingByKey())
-                    .forEach(entry -> sortedSchemas.put(entry.getKey(), entry.getValue()));
+                        .sorted(Map.Entry.comparingByKey())
+                        .forEach(entry -> sortedSchemas.put(entry.getKey(), entry.getValue()));
 
                 openApi.getComponents().setSchemas(sortedSchemas);
             }

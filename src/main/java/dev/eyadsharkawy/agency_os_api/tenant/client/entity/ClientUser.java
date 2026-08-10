@@ -1,12 +1,14 @@
 package dev.eyadsharkawy.agency_os_api.tenant.client.entity;
 
-import dev.eyadsharkawy.agency_os_api.shared.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "client_users")
-@Getter @Setter
+@Getter
+@Setter
 @NoArgsConstructor
 public class ClientUser {
     @Id

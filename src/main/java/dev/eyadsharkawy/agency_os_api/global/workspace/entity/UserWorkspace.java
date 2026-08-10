@@ -2,11 +2,14 @@ package dev.eyadsharkawy.agency_os_api.global.workspace.entity;
 
 import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "user_workspaces", schema = "public")
-@Getter @Setter
+@Getter
+@Setter
 @NoArgsConstructor
 public class UserWorkspace {
     @EmbeddedId

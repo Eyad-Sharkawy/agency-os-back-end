@@ -14,4 +14,5 @@ public record WorkspaceMemberUpdateRequest(
 
         @Schema(description = "Optional client ID if restricted to a specific client", example = "123e4567-e89b-12d3-a456-426614174000")
         UUID clientId
-) {}
+) {
+}

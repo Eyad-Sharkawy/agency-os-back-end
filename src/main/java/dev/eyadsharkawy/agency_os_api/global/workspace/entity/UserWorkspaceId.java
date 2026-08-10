@@ -8,8 +8,10 @@ import java.io.Serializable;
 import java.util.UUID;
 
 @Embeddable
-@Setter @Getter
-@NoArgsConstructor @AllArgsConstructor
+@Setter
+@Getter
+@NoArgsConstructor
+@AllArgsConstructor
 @EqualsAndHashCode
 public class UserWorkspaceId implements Serializable {
     @Column(name = "user_id")
