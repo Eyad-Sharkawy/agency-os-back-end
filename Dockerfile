@@ -10,7 +10,8 @@ RUN chmod +x mvnw
 # Resolve and cache dependencies in a separate layer
 RUN ./mvnw dependency:go-offline -B
 
-# Copy source code and package the application
+# Copy source code and configuration files, and package the application
+COPY checkstyle.xml .
 COPY src src
 RUN ./mvnw clean package -DskipTests
 
