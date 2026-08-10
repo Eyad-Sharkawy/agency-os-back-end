@@ -3,8 +3,16 @@ name: "CodeQL Analysis"
 on:
   push:
     branches: [ "main", "develop" ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   pull_request:
     branches: [ "main", "develop" ]
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
+      - 'LICENSE'
   schedule:
     - cron: '0 0 * * 0' # run weekly on Sunday
 
@@ -26,13 +34,20 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: 'maven'
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+    - name: Compile Code for CodeQL Indexing
+      run: mvn compile -DskipTests -Dcheckstyle.skip -Dspotless.check.skip
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
