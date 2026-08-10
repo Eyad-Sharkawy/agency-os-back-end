@@ -1,12 +1,7 @@
 package dev.eyadsharkawy.agency_os_api.global.workspace.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.shared.entity.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.ManyToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.SQLDelete;
@@ -34,7 +29,6 @@ public class Workspace extends BaseEntity {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
-    @JsonIgnore
-    @ManyToMany(mappedBy = "workspaces")
-    private Set<AppUser> users = new HashSet<>();
+    @OneToMany(mappedBy = "workspace", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<UserWorkspace> userWorkspaces = new HashSet<>();
 }

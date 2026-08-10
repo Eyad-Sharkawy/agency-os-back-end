@@ -2,9 +2,12 @@ package dev.eyadsharkawy.agency_os_api.tenant.invoice.service;
 
 import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
+import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
+import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
 import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
+import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.dto.InvoiceRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.dto.InvoiceResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.entity.Invoice;
@@ -13,6 +16,9 @@ import dev.eyadsharkawy.agency_os_api.tenant.time_entry.entity.TimeEntry;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.repository.TimeEntryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,10 +32,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
+
     private final InvoiceRepository invoiceRepository;
     private final ClientRepository clientRepository;
     private final WorkspaceRepository workspaceRepository;
     private final TimeEntryRepository timeEntryRepository;
+    private final ClientUserRepository clientUserRepository;
+    private final UserWorkspaceRepository userWorkspaceRepository;
 
     @Transactional
     public InvoiceResponse createInvoice(InvoiceRequest request) {
@@ -70,7 +79,27 @@ public class InvoiceService {
 
     @Transactional(readOnly = true)
     public List<InvoiceResponse> getAllInvoices() {
-        log.info("Fetching all invoices");
+        log.info("Fetching invoices");
+
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+            String keycloakId = jwt.getSubject();
+            String tenantId = TenantContextHolder.getTenantId();
+
+            var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+            if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
+                var clientUserOpt = clientUserRepository.findById(keycloakId);
+                if (clientUserOpt.isPresent()) {
+                    UUID clientId = clientUserOpt.get().getClient().getId();
+                    log.info("Client portal user [{}] queried invoices. Filtering for client [{}]", keycloakId, clientId);
+                    return invoiceRepository.findByClientId(clientId).stream()
+                            .map(InvoiceResponse::fromEntity)
+                            .toList();
+                }
+                return List.of();
+            }
+        }
+
         return invoiceRepository.findAll().stream()
                 .map(InvoiceResponse::fromEntity)
                 .toList();
@@ -80,6 +109,9 @@ public class InvoiceService {
     public InvoiceResponse getInvoiceById(UUID id) {
         log.info("Fetching invoice with id: {}", id);
         Invoice invoice = findInvoiceByIdOrThrow(id);
+
+        validateClientAccessToInvoice(invoice);
+
         return InvoiceResponse.fromEntity(invoice);
     }
 
@@ -123,13 +155,13 @@ public class InvoiceService {
         log.info("Generating PDF for invoice: {}", id);
         Invoice invoice = findInvoiceByIdOrThrow(id);
 
-        // Fetch Workspace details
+        validateClientAccessToInvoice(invoice);
+
         String tenantId = TenantContextHolder.getTenantId();
         var workspaceOpt = workspaceRepository.findByTenantId(tenantId);
-        String agencyName = workspaceOpt.map(ws -> ws.getName()).orElse("Agency OS Partner");
-        String contactEmail = workspaceOpt.map(ws -> ws.getContactEmail()).orElse("billing@agency.com");
+        String agencyName = workspaceOpt.map(dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace::getName).orElse("Agency OS Partner");
+        String contactEmail = workspaceOpt.map(dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace::getContactEmail).orElse("billing@agency.com");
 
-        // Fetch all time entries linked to this invoice
         List<TimeEntry> billedEntries = timeEntryRepository.findByInvoiceId(invoice.getId());
 
         try {
@@ -137,6 +169,22 @@ public class InvoiceService {
         } catch (IOException e) {
             log.error("Failed to generate PDF invoice", e);
             throw new RuntimeException("Error rendering PDF", e);
+        }
+    }
+
+    private void validateClientAccessToInvoice(Invoice invoice) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+            String keycloakId = jwt.getSubject();
+            String tenantId = TenantContextHolder.getTenantId();
+
+            var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+            if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
+                var clientUserOpt = clientUserRepository.findById(keycloakId);
+                if (clientUserOpt.isEmpty() || !clientUserOpt.get().getClient().getId().equals(invoice.getClient().getId())) {
+                    throw new AccessDeniedException("Access Denied: You are not authorized to view this invoice.");
+                }
+            }
         }
     }
 

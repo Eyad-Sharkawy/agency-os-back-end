@@ -21,7 +21,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Sharkawy Design Agency\",\n  \"contactEmail\": \"billing@sharkawy.com\"\n}"
+              "raw": "{\n  \"name\": \"Sharkawy Design Agency\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/workspaces",
@@ -70,7 +70,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Sharkawy Design Agency Updated\",\n  \"contactEmail\": \"billing-new@sharkawy.com\"\n}"
+              "raw": "{\n  \"name\": \"Sharkawy Design Agency Updated\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId",
