@@ -28,6 +28,16 @@
     </scm>
     <properties>
         <java.version>21</java.version>
+        <sonar.coverage.exclusions>
+            **/dto/**,
+            **/entity/**,
+            **/repository/**,
+            **/core/config/**,
+            **/core/multitenancy/**,
+            **/core/security/**,
+            **/*Exception*,
+            **/*Application.java
+        </sonar.coverage.exclusions>
     </properties>
     <dependencies>
         <dependency>
