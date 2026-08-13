@@ -45,11 +45,13 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                // withSonarQubeEnv expects a SonarQube Server named 'SonarQube' in Manage Jenkins ➔ System
                 withSonarQubeEnv('SonarQube') {
-                    // Running 'sonar:sonar' directly reuses the build classes and JaCoCo coverage reports 
-                    // generated during the 'Integration Tests' stage, avoiding running tests twice.
-                    sh './mvnw sonar:sonar'
+                    sh './mvnw clean package sonar:sonar'
+                }
+                
+                // Pause the pipeline here and wait for SonarQube's grade
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
