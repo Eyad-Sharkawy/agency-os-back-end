@@ -136,7 +136,7 @@ public class WorkspaceControllerTest {
   void testGetWorkspaceMembers_Success() throws Exception {
     String tenantId = "tenant1";
     when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
-    when(workspaceService.getWorkspaceMembers(eq(tenantId))).thenReturn(List.of());
+    when(workspaceService.getWorkspaceMembers(tenantId)).thenReturn(List.of());
 
     mockMvc
         .perform(
