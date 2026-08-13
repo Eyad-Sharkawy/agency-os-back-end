@@ -46,10 +46,9 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh './mvnw clean package sonar:sonar'
+                    sh './mvnw sonar:sonar'
                 }
                 
-                // Pause the pipeline here and wait for SonarQube's grade
                 timeout(time: 5, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
