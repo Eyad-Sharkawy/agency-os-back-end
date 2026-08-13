@@ -300,7 +300,7 @@ public class WorkspaceService {
         name.toLowerCase()
             .replaceAll("[^a-z0-9]", "_")
             .replaceAll("_+", "_")
-            .replaceAll("(?:^_)|(?:_$)", "");
+            .replaceAll("(?:^_|_$)", "");
 
     if (baseSlug.isBlank()) {
       baseSlug = "workspace";
