@@ -43,6 +43,17 @@ pipeline {
             }
         }
 
+        stage('SonarQube Analysis') {
+            steps {
+                // withSonarQubeEnv expects a SonarQube Server named 'SonarQube' in Manage Jenkins ➔ System
+                withSonarQubeEnv('SonarQube') {
+                    // Running 'sonar:sonar' directly reuses the build classes and JaCoCo coverage reports 
+                    // generated during the 'Integration Tests' stage, avoiding running tests twice.
+                    sh './mvnw sonar:sonar'
+                }
+            }
+        }
+
         stage('Deploy to Server') {
             when {
                 branch 'main'
@@ -70,8 +81,8 @@ pipeline {
             echo 'Pipeline failed. Check the logs.'
 
             mail to: 'eyad.m.sharkawy@gmail.com',
-            subject: "FAILED: Job '${env.JOB_NAME}' [Build #${env.BUILD_NUMBER}]",
-            body: "Your Jenkins pipeline failed. Check the logs at ${env.BUILD_URL}"
+                 subject: "FAILED: Job '${env.JOB_NAME}' [Build #${env.BUILD_NUMBER}]",
+                 body: "Your Jenkins pipeline failed. Check the logs at ${env.BUILD_URL}"
         }
     }
 }
