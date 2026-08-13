@@ -48,12 +48,9 @@ pipeline {
                 branch 'main'
             }
             steps {
-                // Best practice: Deploy from the stable deployment folder, not the ephemeral Jenkins workspace
                 sh '''
-                    # Copy the newly checked-out workspace files to the deployment folder (excluding target to save space)
                     rsync -av --exclude='.git' --exclude='target' ./ /home/ubuntu/agency-os-back-end/
-                    
-                    # Navigate to deployment directory and spin up containers
+
                     cd /home/ubuntu/agency-os-back-end
                     docker compose down
                     docker compose up -d --build
@@ -71,6 +68,10 @@ pipeline {
         }
         failure {
             echo 'Pipeline failed. Check the logs.'
+
+            mail to: 'eyad.m.sharkawy@gmail.com',
+            subject: "FAILED: Job '${env.JOB_NAME}' [Build #${env.BUILD_NUMBER}]",
+            body: "Your Jenkins pipeline failed. Check the logs at ${env.BUILD_URL}"
         }
     }
 }
