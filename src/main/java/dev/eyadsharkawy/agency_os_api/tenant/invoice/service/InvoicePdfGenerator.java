@@ -62,8 +62,8 @@ public class InvoicePdfGenerator {
       contentStream.endText();
 
       // --- BILLING INFO GRID ---
-      int gridLabelY = 660;
-      int gridValueY = 645;
+      float gridLabelY = 660f;
+      float gridValueY = 645f;
 
       // Column 1: BILL TO
       contentStream.beginText();
@@ -140,7 +140,7 @@ public class InvoicePdfGenerator {
       contentStream.beginText();
       contentStream.setFont(standardFont, 9);
       contentStream.setNonStrokingColor(0, 0, 0);
-      contentStream.newLineAtOffset(425, gridLabelY - 15);
+      contentStream.newLineAtOffset(425, gridLabelY - 15f);
       contentStream.showText(
           invoice.getCreatedAt().atZone(ZoneOffset.UTC).format(DATE_FORMATTER).substring(0, 10));
       contentStream.newLineAtOffset(0, -15);
@@ -203,7 +203,7 @@ public class InvoicePdfGenerator {
       contentStream.stroke();
 
       // --- DRAW TABLE ITEMS (WITH MULTI-PAGE FLOW) ---
-      int yPosition = 465;
+      float yPosition = 465f;
       for (TimeEntry entry : billedEntries) {
         // Page break check: if Y position gets too close to the bottom (below Y=80)
         if (yPosition < 80) {
@@ -219,7 +219,7 @@ public class InvoicePdfGenerator {
           contentStream.fill();
 
           // Re-draw Table Headers on the new page
-          int newPageHeaderY = 730;
+          float newPageHeaderY = 730f;
           contentStream.beginText();
           contentStream.setFont(standardBoldFont, 9);
           contentStream.setNonStrokingColor(120 / 255f, 120 / 255f, 120 / 255f);
@@ -244,11 +244,11 @@ public class InvoicePdfGenerator {
           // Draw separator line under headers on new page
           contentStream.setLineWidth(0.8f);
           contentStream.setStrokingColor(230 / 255f, 230 / 255f, 230 / 255f);
-          contentStream.moveTo(50, newPageHeaderY - 10);
-          contentStream.lineTo(562, newPageHeaderY - 10);
+          contentStream.moveTo(50, newPageHeaderY - 10f);
+          contentStream.lineTo(562, newPageHeaderY - 10f);
           contentStream.stroke();
 
-          yPosition = newPageHeaderY - 30; // Reset Y drawing coordinate
+          yPosition = newPageHeaderY - 30f; // Reset Y drawing coordinate
         }
 
         double hoursVal = entry.getDurationMinutes() / 60.0;
@@ -282,14 +282,14 @@ public class InvoicePdfGenerator {
         contentStream.showText("$" + entryCost.setScale(2).toString());
         contentStream.endText();
 
-        yPosition -= 22;
+        yPosition -= 22f;
       }
 
       // Table bottom separator line
       contentStream.setLineWidth(0.8f);
       contentStream.setStrokingColor(230 / 255f, 230 / 255f, 230 / 255f);
-      contentStream.moveTo(50, yPosition + 12);
-      contentStream.lineTo(562, yPosition + 12);
+      contentStream.moveTo(50, yPosition + 12f);
+      contentStream.lineTo(562, yPosition + 12f);
       contentStream.stroke();
 
       // --- 7. TOTAL DUE & TERMS PAGE BREAK PROTECTION ---
@@ -311,7 +311,7 @@ public class InvoicePdfGenerator {
       }
 
       // Draw Total Due
-      int totalY = yPosition - 5;
+      float totalY = yPosition - 5f;
       contentStream.beginText();
       contentStream.setFont(standardBoldFont, 11);
       contentStream.setNonStrokingColor(0, 0, 0);
@@ -327,10 +327,10 @@ public class InvoicePdfGenerator {
       contentStream.endText();
 
       // --- 8. TERMS & CONDITIONS ---
-      int termsY = totalY - 50;
+      float termsY = totalY - 50f;
       // If terms get pushed too close to the bottom band, float them at Y = 85
       if (termsY < 85) {
-        termsY = 85;
+        termsY = 85f;
       }
       contentStream.beginText();
       contentStream.setFont(standardBoldFont, 10);
@@ -342,7 +342,7 @@ public class InvoicePdfGenerator {
       contentStream.beginText();
       contentStream.setFont(standardFont, 9);
       contentStream.setNonStrokingColor(100 / 255f, 100 / 255f, 100 / 255f);
-      contentStream.newLineAtOffset(50, termsY - 16);
+      contentStream.newLineAtOffset(50, termsY - 16f);
       contentStream.showText("Payment is due within 30 days of issue.");
       contentStream.endText();
 
