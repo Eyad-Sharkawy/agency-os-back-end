@@ -9,8 +9,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.eyadsharkawy.agency_os_api.core.config.JacksonConfig;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantSecurityFilter;
 import dev.eyadsharkawy.agency_os_api.core.security.WorkspaceSecurity;
+import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceMemberUpdateRequest;
+import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceOwnershipTransferRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceResponse;
+import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.service.WorkspaceService;
 import java.time.Instant;
 import java.util.List;
@@ -127,5 +130,67 @@ public class WorkspaceControllerTest {
             delete("/api/v1/workspaces/{tenantId}", tenantId)
                 .with(SecurityMockMvcRequestPostProcessors.jwt()))
         .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void testGetWorkspaceMembers_Success() throws Exception {
+    String tenantId = "tenant1";
+    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+    when(workspaceService.getWorkspaceMembers(eq(tenantId))).thenReturn(List.of());
+
+    mockMvc
+        .perform(
+            get("/api/v1/workspaces/{tenantId}/members", tenantId)
+                .with(SecurityMockMvcRequestPostProcessors.jwt()))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void testUpdateWorkspaceMember_Success() throws Exception {
+    String tenantId = "tenant1";
+    UUID userId = UUID.randomUUID();
+    WorkspaceMemberUpdateRequest request =
+        new WorkspaceMemberUpdateRequest(WorkspaceRole.ADMIN, null);
+
+    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+
+    mockMvc
+        .perform(
+            put("/api/v1/workspaces/{tenantId}/members/{userId}", tenantId, userId)
+                .with(SecurityMockMvcRequestPostProcessors.jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void testRemoveWorkspaceMember_Success() throws Exception {
+    String tenantId = "tenant1";
+    UUID userId = UUID.randomUUID();
+
+    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+
+    mockMvc
+        .perform(
+            delete("/api/v1/workspaces/{tenantId}/members/{userId}", tenantId, userId)
+                .with(SecurityMockMvcRequestPostProcessors.jwt()))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void testTransferOwnership_Success() throws Exception {
+    String tenantId = "tenant1";
+    WorkspaceOwnershipTransferRequest request =
+        new WorkspaceOwnershipTransferRequest(UUID.randomUUID());
+
+    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+
+    mockMvc
+        .perform(
+            post("/api/v1/workspaces/{tenantId}/transfer-ownership", tenantId)
+                .with(SecurityMockMvcRequestPostProcessors.jwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isOk());
   }
 }

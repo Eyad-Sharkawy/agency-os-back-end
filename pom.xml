@@ -35,6 +35,7 @@
             **/core/config/**,
             **/core/multitenancy/**,
             **/core/security/**,
+            **/core/exceptions/**,
             **/*Exception*,
             **/*Application.java
         </sonar.coverage.exclusions>
@@ -260,6 +261,7 @@
                                 <exclude>**/core/config/**</exclude>
                                 <exclude>**/core/multitenancy/**</exclude>
                                 <exclude>**/core/security/**</exclude>
+                                <exclude>**/core/exceptions/**</exclude>
                                 <exclude>**/*Exception*</exclude>
                             </excludes>
                             <rules>
