@@ -389,19 +389,19 @@ sequenceDiagram
 
 | Action / Resource | `OWNER` | `ADMIN` | `MEMBER` | `CLIENT` |
 |---|:---:|:---:|:---:|:---:|
-| **Create / Delete Workspace** | ✅ | ❌ | ❌ | ❌ |
-| **Transfer Workspace Ownership** | ✅ | ❌ | ❌ | ❌ |
-| **Manage Members & Roles** | ✅ | ✅ | ❌ | ❌ |
-| **Send Workspace Invitations** | ✅ | ✅ | ❌ | ❌ |
-| **Create & Update Clients** | ✅ | ✅ (Create) | ❌ | ❌ |
-| **Create & Update Projects** | ✅ | ✅ | ❌ | ❌ |
-| **View Projects** | ✅ All | ✅ All | ✅ Assigned | ✅ Own Company |
-| **Create & Update Tasks** | ✅ | ✅ | ❌ | ❌ |
-| **Update Task Status** | ✅ | ✅ | ✅ Assigned only | ❌ |
-| **View Tasks** | ✅ All | ✅ All | ✅ Assigned | ❌ |
-| **Start / Stop Timers & Log Time** | ✅ Assigned tasks | ✅ Assigned tasks | ✅ Assigned tasks | ❌ |
-| **Generate & Delete Invoices** | ✅ | ❌ | ❌ | ❌ |
-| **View & Download Invoice PDFs** | ✅ | ✅ | ❌ | ✅ Own Company |
+| **Create / Delete Workspace** | ✓ | X | X | X |
+| **Transfer Workspace Ownership** | ✓ | X | X | X |
+| **Manage Members & Roles** | ✓ | ✓ | X | X |
+| **Send Workspace Invitations** | ✓ | ✓ | X | X |
+| **Create & Update Clients** | ✓ | ✓ (Create) | X | X |
+| **Create & Update Projects** | ✓ | ✓ | X | X |
+| **View Projects** | ✓ All | ✓ All | ✓ Assigned | ✓ Own Company |
+| **Create & Update Tasks** | ✓ | ✓ | X | X |
+| **Update Task Status** | ✓ | ✓ | ✓ Assigned only | X |
+| **View Tasks** | ✓ All | ✓ All | ✓ Assigned | X |
+| **Start / Stop Timers & Log Time** | ✓ Assigned tasks | ✓ Assigned tasks | ✓ Assigned tasks | X |
+| **Generate & Delete Invoices** | ✓ | X | X | X |
+| **View & Download Invoice PDFs** | ✓ | ✓ | X | ✓ Own Company |
 
 ---
 
