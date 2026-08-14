@@ -72,6 +72,6 @@ class TenantSchemaProvisioningIntegrationTest extends BaseIntegrationTest {
         jdbcTemplate.queryForList(
             "SELECT name, email FROM \"" + TEST_TENANT + "\".clients WHERE id = ?", saved.getId());
     assertThat(rows).hasSize(1);
-    assertThat(rows.get(0).get("name")).isEqualTo("Integration Test Client");
+    assertThat(rows.get(0)).containsEntry("name", "Integration Test Client");
   }
 }
