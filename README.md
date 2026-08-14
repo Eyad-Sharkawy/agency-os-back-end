@@ -10,7 +10,7 @@
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
 - [Core Capabilities](#-core-capabilities)
 - [Tech Stack & Dependencies](#-tech-stack--dependencies)
@@ -39,7 +39,7 @@
 
 ---
 
-## 🚀 Core Capabilities
+## Core Capabilities
 
 | Capability | Description |
 |---|---|
@@ -54,7 +54,7 @@
 
 ---
 
-## 💻 Tech Stack & Dependencies
+## Tech Stack & Dependencies
 
 - **Language & Runtime**: Java 21 (Eclipse Temurin)
 - **Framework**: Spring Boot `4.1.0`
@@ -73,7 +73,7 @@
 
 ---
 
-## 🏛 System Architecture
+## System Architecture
 
 ```mermaid
 graph TB
@@ -124,7 +124,7 @@ graph TB
 
 ---
 
-## 📊 Domain Model & Entity Relationships
+## Domain Model & Entity Relationships
 
 ```mermaid
 erDiagram
@@ -261,7 +261,7 @@ erDiagram
 
 ---
 
-## 📡 Complete REST API Reference
+## Complete REST API Reference
 
 > **Authentication**: All endpoints require `Authorization: Bearer <JWT>` from Keycloak.  
 > **Multi-Tenancy**: All non-global endpoints require `X-Tenant-ID: <tenantId>` in the request headers.
@@ -334,7 +334,7 @@ erDiagram
 
 ### 6. Time Tracking (`/api/v1/time-entries`)
 
-> ⚠️ **Restricted**: `CLIENT` role users are completely blocked from all time-tracking endpoints. Users (`OWNER`, `ADMIN`, `MEMBER`) must be assigned to the target task to log time or run timers.
+> **Restricted**: `CLIENT` role users are completely blocked from all time-tracking endpoints. Users (`OWNER`, `ADMIN`, `MEMBER`) must be assigned to the target task to log time or run timers.
 
 | Method | Path | Required Role | Description & Real-Time Broadcast |
 |---|---|---|---|
@@ -362,7 +362,7 @@ erDiagram
 
 ---
 
-## 🔒 Security & Authentication
+## Security & Authentication
 
 ### OAuth2 Authentication Flow
 
@@ -405,7 +405,7 @@ sequenceDiagram
 
 ---
 
-## 🌐 Real-Time WebSocket Engine
+## Real-Time WebSocket Engine
 
 Agency OS uses **STOMP over WebSocket** with SockJS fallback at `/ws-timer`.
 
@@ -421,7 +421,7 @@ Agency OS uses **STOMP over WebSocket** with SockJS fallback at `/ws-timer`.
 
 ---
 
-## 📄 Automated PDF Invoice Generation
+## Automated PDF Invoice Generation
 
 The `InvoicePdfGenerator` uses **Apache PDFBox 3.0.2** to create multi-page, branded, print-ready PDF documents containing:
 - Workspace header band & styling
@@ -431,14 +431,14 @@ The `InvoicePdfGenerator` uses **Apache PDFBox 3.0.2** to create multi-page, bra
 
 ---
 
-## 🗄 Database Schema & Migrations
+## Database Schema & Migrations
 
 - **Global Track (`db/migration/global`)**: Migrates `public` schema on application boot (`app_users`, `workspaces`, `user_workspaces`, `workspace_invitations`).
 - **Tenant Track (`db/migration/tenant`)**: Migrated dynamically on workspace creation via `TenantSchemaProvisioningService` (`clients`, `client_users`, `projects`, `tasks`, `time_entries`, `active_timers`, `invoices`).
 
 ---
 
-## 📦 Package Layout
+## Package Layout
 
 ```
 dev.eyadsharkawy.agency_os_api
@@ -463,7 +463,7 @@ dev.eyadsharkawy.agency_os_api
 
 ---
 
-## ⚙️ Getting Started & Configuration
+## Getting Started & Configuration
 
 ### Prerequisites
 - Java 21 (Temurin LTS recommended)
@@ -500,7 +500,7 @@ KEYCLOAK_FRONTEND_CLIENT_ID=agency-os-frontend
 
 ---
 
-## 🧪 Testing & Quality Gates
+## Testing & Quality Gates
 
 The backend includes 18 comprehensive test suites:
 - **Controller Tests (`@WebMvcTest`)**: `WorkspaceControllerTest`, `ClientControllerTest`, `ProjectControllerTest`, `TaskControllerTest`, `TimeEntryControllerTest`, `InvoiceControllerTest`, `WorkspaceInvitationControllerTest`.
@@ -523,7 +523,7 @@ The backend includes 18 comprehensive test suites:
 
 ---
 
-## 🚢 CI/CD & Deployment
+## CI/CD & Deployment
 
 The repository includes a declarative [`Jenkinsfile`](Jenkinsfile) that executes:
 1. Spotless & Checkstyle static verification
@@ -534,7 +534,7 @@ The repository includes a declarative [`Jenkinsfile`](Jenkinsfile) that executes
 
 ---
 
-## 📚 Documentation Reference
+## Documentation Reference
 
 - [📐 Deep-Dive Architecture Whitepaper](docs/ARCHITECTURE.md)
 - [📡 Complete API Specification & Request/Response Catalog](docs/API.md)
