@@ -35,3 +35,6 @@ build/
 ### Enviroment ###
 .env
 .env.properties
+
+### Docker ###
+docker-compose.override.yml

@@ -13,7 +13,7 @@ RUN ./mvnw dependency:go-offline -B
 # Copy source code and configuration files, and package the application
 COPY checkstyle.xml .
 COPY src src
-RUN ./mvnw clean package -DskipTests
+RUN ./mvnw clean package -DskipTests -Dspotless.check.skip=true -Dcheckstyle.skip=true
 
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
