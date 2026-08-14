@@ -362,7 +362,26 @@ Creates a task under a project.
 ---
 
 ### `GET /api/v1/tasks`
-Lists tasks (filtered to assigned tasks for `MEMBER`).
+Lists tasks (filtered to assigned tasks for `MEMBER`).  
+**Permissions**: `OWNER`, `ADMIN`, `MEMBER`, `CLIENT`
+
+---
+
+### `GET /api/v1/tasks/{id}`
+Retrieves a specific task by ID. Verifies that `MEMBER` users are assigned to this task before returning.  
+**Permissions**: `OWNER`, `ADMIN`, `MEMBER`, `CLIENT`
+
+---
+
+### `GET /api/v1/tasks/project/{projectId}`
+Lists all tasks for a specific project. `MEMBER` users only receive tasks they are assigned to.  
+**Permissions**: `OWNER`, `ADMIN`, `MEMBER`, `CLIENT`
+
+---
+
+### `GET /api/v1/tasks/assignee/{assigneeId}`
+Lists all tasks assigned to a specific Keycloak user ID. `MEMBER` users can only query their own ID.  
+**Permissions**: `OWNER`, `ADMIN`, `MEMBER`
 
 ---
 
@@ -380,7 +399,7 @@ Quick status update for task boards (Kanban drag-and-drop).
 ---
 
 ### `PUT /api/v1/tasks/{id}`
-Full task update.  
+Full task update (title, description, dates, priority, status, project, assignees).  
 **Permissions**: `OWNER`, `ADMIN`
 
 ---

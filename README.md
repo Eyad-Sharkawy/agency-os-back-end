@@ -138,6 +138,7 @@ erDiagram
 
     Project ||--o{ Task : "breaks down into"
 
+    Task ||--o{ TaskAssignee : "assigned to members"
     Task ||--o{ TimeEntry : "logged on"
     Task ||--o| ActiveTimer : "active stopwatch"
 
@@ -145,7 +146,7 @@ erDiagram
 
     AppUser {
         UUID id PK
-        string keycloakId UK
+        string keycloakId UK "Keycloak sub"
         string username UK
         string email UK
         string firstName
@@ -157,7 +158,7 @@ erDiagram
     Workspace {
         UUID id PK
         string name
-        string tenantId UK
+        string tenantId UK "Schema identifier"
         string contactEmail
         boolean isActive
         Instant createdAt
@@ -165,18 +166,21 @@ erDiagram
     }
 
     UserWorkspace {
-        UUID userId PK
-        UUID workspaceId PK
+        UUID userId PK, FK
+        UUID workspaceId PK, FK
         WorkspaceRole role
     }
 
     WorkspaceInvitation {
         UUID id PK
+        UUID workspaceId FK
         string username
         string invitedByUsername
         WorkspaceRole role
-        InvitationStatus status
         UUID clientId
+        InvitationStatus status
+        Instant createdAt
+        Instant updatedAt
     }
 
     Client {
@@ -190,13 +194,17 @@ erDiagram
     }
 
     ClientUser {
-        string userId PK
+        string userId PK "Keycloak sub"
         UUID clientId FK
+        Instant createdAt
+        Instant updatedAt
     }
 
     Project {
         UUID id PK
+        UUID clientId FK
         string name
+        string description
         BigDecimal budget
         BigDecimal billingRate
         ProjectStatus status
@@ -207,10 +215,11 @@ erDiagram
 
     Task {
         UUID id PK
+        UUID projectId FK
         string title
         string description
-        LocalDate startDate
-        LocalDate dueDate
+        Instant startDate
+        Instant dueDate
         int estimatedMinutes
         TaskPriority priority
         TaskStatus status
@@ -218,9 +227,16 @@ erDiagram
         Instant updatedAt
     }
 
+    TaskAssignee {
+        UUID taskId PK, FK
+        string userId PK "Keycloak sub"
+    }
+
     TimeEntry {
         UUID id PK
-        string userId
+        UUID taskId FK
+        UUID invoiceId FK "Nullable"
+        string userId "Keycloak sub"
         int durationMinutes
         boolean isBillable
         Instant createdAt
@@ -228,13 +244,14 @@ erDiagram
     }
 
     ActiveTimer {
-        string userId PK
-        Instant startTime
+        string userId PK "Keycloak sub (1 per user)"
         UUID taskId FK
+        Instant startTime
     }
 
     Invoice {
         UUID id PK
+        UUID clientId FK
         BigDecimal totalAmount
         InvoiceStatus status
         Instant createdAt
