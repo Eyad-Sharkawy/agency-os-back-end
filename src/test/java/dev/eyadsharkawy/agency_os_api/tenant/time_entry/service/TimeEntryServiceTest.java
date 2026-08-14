@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
+import dev.eyadsharkawy.agency_os_api.core.security.WorkspaceSecurity;
 import dev.eyadsharkawy.agency_os_api.tenant.task.entity.Task;
 import dev.eyadsharkawy.agency_os_api.tenant.task.repository.TaskRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.dto.ActiveTimerResponse;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +36,7 @@ class TimeEntryServiceTest {
   @Mock private TimeEntryRepository timeEntryRepository;
   @Mock private ActiveTimerRepository activeTimerRepository;
   @Mock private TaskRepository taskRepository;
+  @Mock private WorkspaceSecurity workspaceSecurity;
 
   @InjectMocks private TimeEntryService timeEntryService;
 
@@ -50,7 +53,7 @@ class TimeEntryServiceTest {
     task = new Task();
     task.setId(taskId);
     task.setTitle("Develop Feature");
-    task.setAssigneeIds(Set.of("kc-user-123"));
+    task.setAssigneeIds(Set.of("kc-user-123", "kc-target-456"));
   }
 
   @Test
@@ -86,6 +89,57 @@ class TimeEntryServiceTest {
     assertThat(response.durationMinutes()).isEqualTo(60);
     assertThat(response.isBillable()).isTrue();
     verify(timeEntryRepository, times(1)).save(any(TimeEntry.class));
+  }
+
+  @Test
+  @DisplayName("logTimeManually on behalf of other user by OWNER or ADMIN should succeed")
+  void logTimeManually_OnBehalf_OwnerAdmin_Success() {
+    TimeEntryRequest request = new TimeEntryRequest(taskId, 90, true, "kc-target-456");
+
+    when(workspaceSecurity.hasRole(new String[] {"OWNER", "ADMIN"})).thenReturn(true);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+    when(timeEntryRepository.save(any(TimeEntry.class)))
+        .thenAnswer(
+            i -> {
+              TimeEntry te = i.getArgument(0);
+              te.setId(UUID.randomUUID());
+              return te;
+            });
+
+    TimeEntryResponse response = timeEntryService.logTimeManually(jwt, request);
+
+    assertThat(response).isNotNull();
+    assertThat(response.userId()).isEqualTo("kc-target-456");
+    assertThat(response.durationMinutes()).isEqualTo(90);
+    verify(timeEntryRepository, times(1)).save(any(TimeEntry.class));
+  }
+
+  @Test
+  @DisplayName(
+      "logTimeManually on behalf of other user by MEMBER should throw AccessDeniedException")
+  void logTimeManually_OnBehalf_Member_ThrowsAccessDeniedException() {
+    TimeEntryRequest request = new TimeEntryRequest(taskId, 90, true, "kc-target-456");
+
+    when(workspaceSecurity.hasRole(new String[] {"OWNER", "ADMIN"})).thenReturn(false);
+
+    assertThatThrownBy(() -> timeEntryService.logTimeManually(jwt, request))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Only OWNER or ADMIN can log time on behalf of other team members");
+  }
+
+  @Test
+  @DisplayName(
+      "logTimeManually on behalf of other user who is not assigned should throw IllegalArgumentException")
+  void logTimeManually_OnBehalf_TargetNotAssigned_ThrowsException() {
+    task.setAssigneeIds(Set.of("kc-user-123")); // target "kc-target-456" not assigned
+    TimeEntryRequest request = new TimeEntryRequest(taskId, 90, true, "kc-target-456");
+
+    when(workspaceSecurity.hasRole(new String[] {"OWNER", "ADMIN"})).thenReturn(true);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+
+    assertThatThrownBy(() -> timeEntryService.logTimeManually(jwt, request))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("not assigned to");
   }
 
   @Test

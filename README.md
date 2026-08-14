@@ -338,7 +338,7 @@ erDiagram
 
 | Method | Path | Required Role | Description & Real-Time Broadcast |
 |---|---|---|---|
-| `POST` | `/api/v1/time-entries` | `OWNER`, `ADMIN`, `MEMBER` | Manually log time entry (must be assigned to task) → broadcasts to `/topic/{tenantId}/time-entries` |
+| `POST` | `/api/v1/time-entries` | `OWNER`, `ADMIN`, `MEMBER` | Manually log time entry (OWNER/ADMIN can log on behalf of assigned members) → broadcasts to `/topic/{tenantId}/time-entries` |
 | `POST` | `/api/v1/time-entries/start/{taskId}` | `OWNER`, `ADMIN`, `MEMBER` | Start stopwatch timer on assigned task (1 active timer per user limit) → broadcasts to `/topic/{tenantId}/timers/start` |
 | `POST` | `/api/v1/time-entries/stop` | `OWNER`, `ADMIN`, `MEMBER` | Stop stopwatch timer, compute duration, record `TimeEntry` → broadcasts to `/topic/{tenantId}/timers/stop` |
 | `GET` | `/api/v1/time-entries/active` | `OWNER`, `ADMIN`, `MEMBER` | Retrieve currently active running stopwatch timer for logged-in user |

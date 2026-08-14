@@ -16,4 +16,14 @@ public record TimeEntryRequest(
         @Positive(message = "Duration must be greater than zero")
         int durationMinutes,
     @Schema(description = "Whether this time entry is billable to the client", example = "true")
-        boolean isBillable) {}
+        boolean isBillable,
+    @Schema(
+            description =
+                "Keycloak user ID on whose behalf the time is logged (Optional: OWNER and ADMIN only, defaults to authenticated user)",
+            example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+        String userId) {
+
+  public TimeEntryRequest(UUID taskId, int durationMinutes, boolean isBillable) {
+    this(taskId, durationMinutes, isBillable, null);
+  }
+}

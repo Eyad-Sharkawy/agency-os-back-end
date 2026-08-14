@@ -636,7 +636,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"taskId\": \"{{taskId}}\",\n  \"durationMinutes\": 120,\n  \"isBillable\": true\n}"
+              "raw": "{\n  \"taskId\": \"{{taskId}}\",\n  \"durationMinutes\": 120,\n  \"isBillable\": true,\n  \"userId\": \"{{memberUserId}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/time-entries",

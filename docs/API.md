@@ -415,16 +415,18 @@ Deletes a task.
 Stopwatch and manual time logging. `CLIENT` role users are completely locked out. Users must be assigned to the target task in order to log time or start a stopwatch timer.
 
 ### `POST /api/v1/time-entries`
-Manually records a time entry for an assigned task. Broadcasts to `/topic/{tenantId}/time-entries`.
+Manually records a time entry for an assigned task. `OWNER` and `ADMIN` can optionally provide `userId` to log time on behalf of an assigned team member. Broadcasts to `/topic/{tenantId}/time-entries`.
 
 **Request Body (`TimeEntryRequest`)**:
 ```json
 {
   "taskId": "3c2a1b0f-9876-5432-10fe-dcba09876543",
   "durationMinutes": 120,
-  "isBillable": true
+  "isBillable": true,
+  "userId": "5a2deb4d-1b2c-3def-8bad-1c0d7b3dcb99"
 }
 ```
+> Note: `userId` is optional. If omitted, defaults to the authenticated user. `MEMBER` role can only log time for themselves. In all cases, the target user must be assigned to the task.
 
 ---
 

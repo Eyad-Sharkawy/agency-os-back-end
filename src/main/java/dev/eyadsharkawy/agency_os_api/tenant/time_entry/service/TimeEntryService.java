@@ -1,6 +1,7 @@
 package dev.eyadsharkawy.agency_os_api.tenant.time_entry.service;
 
 import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
+import dev.eyadsharkawy.agency_os_api.core.security.WorkspaceSecurity;
 import dev.eyadsharkawy.agency_os_api.tenant.task.entity.Task;
 import dev.eyadsharkawy.agency_os_api.tenant.task.repository.TaskRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.dto.ActiveTimerResponse;
@@ -17,6 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,21 +30,33 @@ public class TimeEntryService {
   private final TimeEntryRepository timeEntryRepository;
   private final ActiveTimerRepository activeTimerRepository;
   private final TaskRepository taskRepository;
+  private final WorkspaceSecurity workspaceSecurity;
 
   @Transactional
   public TimeEntryResponse logTimeManually(Jwt jwt, TimeEntryRequest request) {
-    String userId = jwt.getSubject();
+    String callerUserId = jwt.getSubject();
+    String targetUserId =
+        (request.userId() != null && !request.userId().isBlank()) ? request.userId() : callerUserId;
+
+    if (!callerUserId.equals(targetUserId)) {
+      if (!workspaceSecurity.hasRole(new String[] {"OWNER", "ADMIN"})) {
+        throw new AccessDeniedException(
+            "Access Denied: Only OWNER or ADMIN can log time on behalf of other team members.");
+      }
+    }
+
     log.info(
-        "User [{}] manually logging [{}] minutes on task [{}]",
-        userId,
+        "Caller [{}] manually logging [{}] minutes on task [{}] for target user [{}]",
+        callerUserId,
         request.durationMinutes(),
-        request.taskId());
+        request.taskId(),
+        targetUserId);
 
     Task task = findTaskByIdOrThrow(request.taskId());
-    validateUserIsAssignedToTask(userId, task);
+    validateUserIsAssignedToTask(targetUserId, task);
 
     TimeEntry timeEntry = new TimeEntry();
-    timeEntry.mapFromRequestWithIdAndTask(request, userId, task);
+    timeEntry.mapFromRequestWithIdAndTask(request, targetUserId, task);
 
     TimeEntry savedEntry = timeEntryRepository.save(timeEntry);
     return TimeEntryResponse.fromEntity(savedEntry);
@@ -137,7 +151,7 @@ public class TimeEntryService {
 
   private void validateUserIsAssignedToTask(String userId, Task task) {
     if (task.getAssigneeIds() == null || !task.getAssigneeIds().contains(userId)) {
-      throw new IllegalArgumentException("You cannot log time on a task you are not assigned to.");
+      throw new IllegalArgumentException("User is not assigned to this task.");
     }
   }
 }
