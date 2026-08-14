@@ -16,10 +16,10 @@ public class WorkspaceSecurity {
 
   public boolean hasRole(String... allowedRoles) {
     String tenantId = TenantContextHolder.getTenantId();
-    return hasRole(tenantId, allowedRoles);
+    return hasRoleInTenant(tenantId, allowedRoles);
   }
 
-  public boolean hasRole(String tenantId, String... allowedRoles) {
+  public boolean hasRoleInTenant(String tenantId, String... allowedRoles) {
     var authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication == null || !(authentication.getPrincipal() instanceof Jwt jwt)) {
       return false;

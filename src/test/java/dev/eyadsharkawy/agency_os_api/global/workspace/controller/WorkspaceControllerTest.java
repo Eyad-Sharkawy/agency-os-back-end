@@ -97,7 +97,7 @@ public class WorkspaceControllerTest {
     String tenantId = "tenant1";
     WorkspaceRequest request = new WorkspaceRequest("Updated Workspace");
 
-    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+    when(workspaceSecurity.hasRoleInTenant(anyString(), any(String[].class))).thenReturn(true);
     when(workspaceService.updateUserWorkspaceByTenantId(eq(tenantId), any()))
         .thenReturn(
             new WorkspaceResponse(
@@ -123,7 +123,7 @@ public class WorkspaceControllerTest {
   void testDeleteWorkspace_Success() throws Exception {
     String tenantId = "tenant1";
 
-    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+    when(workspaceSecurity.hasRoleInTenant(anyString(), any(String[].class))).thenReturn(true);
 
     mockMvc
         .perform(
@@ -135,7 +135,7 @@ public class WorkspaceControllerTest {
   @Test
   void testGetWorkspaceMembers_Success() throws Exception {
     String tenantId = "tenant1";
-    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+    when(workspaceSecurity.hasRoleInTenant(anyString(), any(String[].class))).thenReturn(true);
     when(workspaceService.getWorkspaceMembers(tenantId)).thenReturn(List.of());
 
     mockMvc
@@ -152,7 +152,7 @@ public class WorkspaceControllerTest {
     WorkspaceMemberUpdateRequest request =
         new WorkspaceMemberUpdateRequest(WorkspaceRole.ADMIN, null);
 
-    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+    when(workspaceSecurity.hasRoleInTenant(anyString(), any(String[].class))).thenReturn(true);
 
     mockMvc
         .perform(
@@ -168,7 +168,7 @@ public class WorkspaceControllerTest {
     String tenantId = "tenant1";
     UUID userId = UUID.randomUUID();
 
-    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+    when(workspaceSecurity.hasRoleInTenant(anyString(), any(String[].class))).thenReturn(true);
 
     mockMvc
         .perform(
@@ -183,7 +183,7 @@ public class WorkspaceControllerTest {
     WorkspaceOwnershipTransferRequest request =
         new WorkspaceOwnershipTransferRequest(UUID.randomUUID());
 
-    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+    when(workspaceSecurity.hasRoleInTenant(anyString(), any(String[].class))).thenReturn(true);
 
     mockMvc
         .perform(

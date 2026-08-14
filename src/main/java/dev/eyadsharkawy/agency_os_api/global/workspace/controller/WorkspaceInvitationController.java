@@ -29,7 +29,7 @@ public class WorkspaceInvitationController {
   private final WorkspaceInvitationService invitationService;
 
   @PostMapping("/{tenantId}/invitations")
-  @PreAuthorize("@workspaceSecurity.hasRole(#tenantId, 'OWNER', 'ADMIN')")
+  @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER', 'ADMIN')")
   @Operation(
       summary = "Send workspace invitation",
       description =

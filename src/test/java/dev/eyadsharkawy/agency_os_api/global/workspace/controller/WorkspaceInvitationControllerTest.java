@@ -74,7 +74,7 @@ public class WorkspaceInvitationControllerTest {
             "PENDING",
             Instant.now());
 
-    when(workspaceSecurity.hasRole(anyString(), any(String[].class))).thenReturn(true);
+    when(workspaceSecurity.hasRoleInTenant(anyString(), any(String[].class))).thenReturn(true);
     when(invitationService.inviteUser(any(), eq(tenantId), any())).thenReturn(response);
 
     mockMvc

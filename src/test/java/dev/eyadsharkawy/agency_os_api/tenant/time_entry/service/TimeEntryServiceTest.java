@@ -96,7 +96,7 @@ class TimeEntryServiceTest {
   void logTimeManually_OnBehalf_OwnerAdmin_Success() {
     TimeEntryRequest request = new TimeEntryRequest(taskId, 90, true, "kc-target-456");
 
-    when(workspaceSecurity.hasRole(new String[] {"OWNER", "ADMIN"})).thenReturn(true);
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(true);
     when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
     when(timeEntryRepository.save(any(TimeEntry.class)))
         .thenAnswer(
@@ -120,7 +120,7 @@ class TimeEntryServiceTest {
   void logTimeManually_OnBehalf_Member_ThrowsAccessDeniedException() {
     TimeEntryRequest request = new TimeEntryRequest(taskId, 90, true, "kc-target-456");
 
-    when(workspaceSecurity.hasRole(new String[] {"OWNER", "ADMIN"})).thenReturn(false);
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(false);
 
     assertThatThrownBy(() -> timeEntryService.logTimeManually(jwt, request))
         .isInstanceOf(AccessDeniedException.class)
@@ -134,7 +134,7 @@ class TimeEntryServiceTest {
     task.setAssigneeIds(Set.of("kc-user-123")); // target "kc-target-456" not assigned
     TimeEntryRequest request = new TimeEntryRequest(taskId, 90, true, "kc-target-456");
 
-    when(workspaceSecurity.hasRole(new String[] {"OWNER", "ADMIN"})).thenReturn(true);
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(true);
     when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
 
     assertThatThrownBy(() -> timeEntryService.logTimeManually(jwt, request))

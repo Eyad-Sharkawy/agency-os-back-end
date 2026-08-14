@@ -38,11 +38,9 @@ public class TimeEntryService {
     String targetUserId =
         (request.userId() != null && !request.userId().isBlank()) ? request.userId() : callerUserId;
 
-    if (!callerUserId.equals(targetUserId)) {
-      if (!workspaceSecurity.hasRole(new String[] {"OWNER", "ADMIN"})) {
-        throw new AccessDeniedException(
-            "Access Denied: Only OWNER or ADMIN can log time on behalf of other team members.");
-      }
+    if (!callerUserId.equals(targetUserId) && !workspaceSecurity.hasRole("OWNER", "ADMIN")) {
+      throw new AccessDeniedException(
+          "Access Denied: Only OWNER or ADMIN can log time on behalf of other team members.");
     }
 
     log.info(

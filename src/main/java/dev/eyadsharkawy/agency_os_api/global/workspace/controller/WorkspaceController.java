@@ -51,7 +51,7 @@ public class WorkspaceController {
   }
 
   @PutMapping("/{tenantId}")
-  @PreAuthorize("@workspaceSecurity.hasRole(#tenantId, 'OWNER')")
+  @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER')")
   @Operation(
       summary = "Update workspace settings",
       description =
@@ -65,7 +65,7 @@ public class WorkspaceController {
   }
 
   @DeleteMapping("/{tenantId}")
-  @PreAuthorize("@workspaceSecurity.hasRole(#tenantId, 'OWNER')")
+  @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER')")
   @Operation(
       summary = "Delete workspace",
       description =
@@ -77,7 +77,7 @@ public class WorkspaceController {
   }
 
   @GetMapping("/{tenantId}/members")
-  @PreAuthorize("@workspaceSecurity.hasRole(#tenantId, 'OWNER', 'ADMIN')")
+  @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER', 'ADMIN')")
   @Operation(
       summary = "List workspace members",
       description =
@@ -89,7 +89,7 @@ public class WorkspaceController {
   }
 
   @PutMapping("/{tenantId}/members/{userId}")
-  @PreAuthorize("@workspaceSecurity.hasRole(#tenantId, 'OWNER', 'ADMIN')")
+  @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER', 'ADMIN')")
   @Operation(
       summary = "Update workspace member role",
       description =
@@ -105,7 +105,7 @@ public class WorkspaceController {
   }
 
   @DeleteMapping("/{tenantId}/members/{userId}")
-  @PreAuthorize("@workspaceSecurity.hasRole(#tenantId, 'OWNER', 'ADMIN')")
+  @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER', 'ADMIN')")
   @Operation(
       summary = "Remove member from workspace",
       description =
@@ -120,7 +120,7 @@ public class WorkspaceController {
   }
 
   @PostMapping("/{tenantId}/transfer-ownership")
-  @PreAuthorize("@workspaceSecurity.hasRole(#tenantId, 'OWNER')")
+  @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER')")
   @Operation(
       summary = "Transfer workspace ownership",
       description =
