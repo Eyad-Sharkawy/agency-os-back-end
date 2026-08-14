@@ -14,6 +14,10 @@ public record ProjectResponse(
             example = "123e4567-e89b-12d3-a456-426614174000")
         UUID id,
     @Schema(description = "Name of the project", example = "Website Redesign") String name,
+    @Schema(
+            description = "Detailed description of the project",
+            example = "Redesigning corporate website with Next.js")
+        String description,
     @Schema(description = "Total budget allocated for the project", example = "15000.00")
         BigDecimal budget,
     @Schema(description = "Current status of the project", example = "IN_PROGRESS")
@@ -36,6 +40,7 @@ public record ProjectResponse(
     return new ProjectResponse(
         project.getId(),
         project.getName(),
+        project.getDescription(),
         project.getBudget(),
         project.getStatus(),
         project.getClient().getId(),

@@ -62,6 +62,7 @@ public class ProjectControllerTest {
     ProjectRequest request =
         new ProjectRequest(
             "Project Name",
+            "Project Description",
             BigDecimal.valueOf(1000),
             ProjectStatus.IN_PROGRESS,
             UUID.randomUUID(),
@@ -70,6 +71,7 @@ public class ProjectControllerTest {
         new ProjectResponse(
             UUID.randomUUID(),
             "Project Name",
+            "Project Description",
             BigDecimal.valueOf(1000),
             ProjectStatus.IN_PROGRESS,
             UUID.randomUUID(),
@@ -112,6 +114,7 @@ public class ProjectControllerTest {
             new ProjectResponse(
                 projectId,
                 "Project",
+                "Project Description",
                 BigDecimal.TEN,
                 ProjectStatus.IN_PROGRESS,
                 UUID.randomUUID(),
@@ -147,6 +150,7 @@ public class ProjectControllerTest {
     ProjectRequest request =
         new ProjectRequest(
             "Updated Name",
+            "Updated Description",
             BigDecimal.valueOf(2000),
             ProjectStatus.DELIVERED,
             UUID.randomUUID(),
@@ -158,6 +162,7 @@ public class ProjectControllerTest {
             new ProjectResponse(
                 projectId,
                 "Updated Name",
+                "Updated Description",
                 BigDecimal.valueOf(2000),
                 ProjectStatus.DELIVERED,
                 UUID.randomUUID(),

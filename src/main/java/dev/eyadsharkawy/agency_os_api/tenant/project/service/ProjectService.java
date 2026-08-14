@@ -59,6 +59,7 @@ public class ProjectService {
 
     Project project = new Project();
     project.setName(request.name());
+    project.setDescription(request.description());
     project.setBudget(request.budget());
     project.setStatus(request.status());
     project.setClient(client);
@@ -194,6 +195,7 @@ public class ProjectService {
     }
 
     project.setName(request.name());
+    project.setDescription(request.description());
     project.setBudget(request.budget());
     project.setStatus(request.status());
     project.setBillingRate(request.billingRate());

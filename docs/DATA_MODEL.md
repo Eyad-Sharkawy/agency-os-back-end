@@ -126,10 +126,11 @@ Project deliverables, budgets, and billing rates.
 | Column | Type | Constraints | Description |
 |---|---|---|---|
 | `id` | `UUID` | `PRIMARY KEY` | Project UUID |
-| `name` | `VARCHAR(255)` | `NOT NULL` | Project title |
-| `budget` | `NUMERIC(15,2)` | `DEFAULT 0.00` | Budget amount |
-| `billing_rate` | `NUMERIC(10,2)` | `DEFAULT 100.00` | Default hourly billing rate for tasks |
-| `status` | `VARCHAR(50)` | `DEFAULT 'PLANNING'` | `PLANNING`, `IN_PROGRESS`, `ON_HOLD`, `DELIVERED` |
+| `name` | `VARCHAR(100)` | `NOT NULL` | Project title |
+| `description` | `TEXT` | `NULL` | Optional project description |
+| `budget` | `NUMERIC(12,2)` | `DEFAULT 0.00` | Budget amount |
+| `billing_rate` | `NUMERIC(12,2)` | `DEFAULT 100.00` | Default hourly billing rate for tasks |
+| `status` | `VARCHAR(20)` | `DEFAULT 'PLANNING'` | `PLANNING`, `IN_PROGRESS`, `ON_HOLD`, `DELIVERED` |
 | `client_id` | `UUID` | `FK -> clients(id)` | Associated client (nullable for internal projects) |
 | `is_active` | `BOOLEAN` | `DEFAULT true` | Soft-deletion flag |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL` | Audit timestamp |

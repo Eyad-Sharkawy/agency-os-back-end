@@ -15,6 +15,10 @@ public record ProjectRequest(
     @Schema(description = "Name of the project", example = "Website Redesign")
         @NotBlank(message = "Project name is required")
         String name,
+    @Schema(
+            description = "Detailed description of the project",
+            example = "Redesigning corporate website with Next.js")
+        String description,
     @Schema(description = "Project budget amount", example = "15000.00")
         @PositiveOrZero(message = "Budget must be zero or positive")
         BigDecimal budget,

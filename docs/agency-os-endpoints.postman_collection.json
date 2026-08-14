@@ -277,7 +277,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Mobile Application Phase 1\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 12000.00,\n  \"status\": \"PLANNING\",\n  \"billingRate\": 125.00\n}"
+              "raw": "{\n  \"name\": \"Mobile Application Phase 1\",\n  \"description\": \"Initial MVP development of the mobile application for iOS and Android.\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 12000.00,\n  \"status\": \"PLANNING\",\n  \"billingRate\": 125.00\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/projects",
@@ -377,7 +377,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Mobile Application Phase 1 - Updated\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 15000.00,\n  \"status\": \"IN_PROGRESS\",\n  \"billingRate\": 130.00\n}"
+              "raw": "{\n  \"name\": \"Mobile Application Phase 1 - Updated\",\n  \"description\": \"Updated scope with backend push notification services.\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 15000.00,\n  \"status\": \"IN_PROGRESS\",\n  \"billingRate\": 130.00\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/projects/:id",

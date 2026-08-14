@@ -275,6 +275,7 @@ Creates a new project.
 ```json
 {
   "name": "E-Commerce Redesign",
+  "description": "Full redesign and replatforming to Next.js and Headless Shopify",
   "budget": 25000.00,
   "billingRate": 150.00,
   "status": "IN_PROGRESS",

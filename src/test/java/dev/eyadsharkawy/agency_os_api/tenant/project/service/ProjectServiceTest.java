@@ -102,6 +102,7 @@ class ProjectServiceTest {
     ProjectRequest request =
         new ProjectRequest(
             "Redesign",
+            "Optional Description",
             new BigDecimal("5000"),
             ProjectStatus.IN_PROGRESS,
             clientId,
@@ -119,6 +120,7 @@ class ProjectServiceTest {
     ProjectRequest request =
         new ProjectRequest(
             "Redesign",
+            "Optional Description",
             new BigDecimal("5000"),
             ProjectStatus.IN_PROGRESS,
             clientId,
@@ -137,6 +139,7 @@ class ProjectServiceTest {
 
     assertThat(response).isNotNull();
     assertThat(response.name()).isEqualTo("Redesign");
+    assertThat(response.description()).isEqualTo("Optional Description");
     assertThat(response.clientId()).isEqualTo(clientId);
   }
 
@@ -233,6 +236,7 @@ class ProjectServiceTest {
     ProjectRequest request =
         new ProjectRequest(
             "New Title",
+            "Updated Description",
             new BigDecimal("20000"),
             ProjectStatus.DELIVERED,
             clientId,
@@ -243,6 +247,7 @@ class ProjectServiceTest {
     ProjectResponse response = projectService.updateProjectById(projectId, request);
 
     assertThat(response.name()).isEqualTo("New Title");
+    assertThat(response.description()).isEqualTo("Updated Description");
     assertThat(response.status()).isEqualTo(ProjectStatus.DELIVERED);
   }
 
