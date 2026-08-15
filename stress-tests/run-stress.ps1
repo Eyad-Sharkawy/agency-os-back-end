@@ -4,6 +4,12 @@ param (
     [string]$Type = "all"
 )
 
+# Clear cached environment variables to prevent leakage from previous runs in the active shell session
+[System.Environment]::SetEnvironmentVariable("TENANT_IDS", $null, "Process")
+[System.Environment]::SetEnvironmentVariable("TENANT_ID", $null, "Process")
+[System.Environment]::SetEnvironmentVariable("JWT_TOKEN", $null, "Process")
+[System.Environment]::SetEnvironmentVariable("JWT_TOKENS", $null, "Process")
+
 $hasManualToken = $false
 # 1. Load .env file from the root directory
 $envFile = Join-Path $PSScriptRoot "../.env"
@@ -24,27 +30,35 @@ if (Test-Path $envFile) {
     Write-Warning "Could not find .env file at $envFile"
 }
 
-# 2. Get JWT Token from Keycloak programmatically if not manually set in .env
+# 2. Get JWT Tokens from Keycloak programmatically if not manually set in .env
 $clientId = if ($env:KEYCLOAK_TEST_CLIENT_ID) { $env:KEYCLOAK_TEST_CLIENT_ID } else { $env:KEYCLOAK_FRONTEND_CLIENT_ID }
+$usernames = if ($env:TEST_USER_USERNAMES) { $env:TEST_USER_USERNAMES.Split(',') } else { @($env:TEST_USER_USERNAME) }
 
-if (-not $hasManualToken -and $env:KEYCLOAK_ISSUER_URI -and $clientId -and $env:TEST_USER_USERNAME -and $env:TEST_USER_PASSWORD) {
-    Write-Host "Fetching JWT Token from Keycloak..." -ForegroundColor Cyan
+if (-not $hasManualToken -and $env:KEYCLOAK_ISSUER_URI -and $clientId -and $usernames.Count -gt 0 -and $env:TEST_USER_PASSWORD) {
+    Write-Host "Fetching JWT Tokens from Keycloak for users: $($env:TEST_USER_USERNAMES)..." -ForegroundColor Cyan
     try {
         $tokenUrl = "$($env:KEYCLOAK_ISSUER_URI)/protocol/openid-connect/token"
-        $body = @{
-            grant_type = "password"
-            client_id  = $clientId
-            username   = $env:TEST_USER_USERNAME
-            password   = $env:TEST_USER_PASSWORD
+        $tokenList = @()
+        foreach ($username in $usernames) {
+            $username = $username.Trim()
+            if (-not $username) { continue }
+            $body = @{
+                grant_type = "password"
+                client_id  = $clientId
+                username   = $username
+                password   = $env:TEST_USER_PASSWORD
+            }
+            if ($env:KEYCLOAK_TEST_CLIENT_SECRET) {
+                $body.Add("client_secret", $env:KEYCLOAK_TEST_CLIENT_SECRET)
+            }
+            $response = Invoke-RestMethod -Uri $tokenUrl -Method Post -ContentType "application/x-www-form-urlencoded" -Body $body
+            $tokenList += $response.access_token
         }
-        if ($env:KEYCLOAK_TEST_CLIENT_SECRET) {
-            $body.Add("client_secret", $env:KEYCLOAK_TEST_CLIENT_SECRET)
-        }
-        $response = Invoke-RestMethod -Uri $tokenUrl -Method Post -ContentType "application/x-www-form-urlencoded" -Body $body
-        $env:JWT_TOKEN = $response.access_token
-        Write-Host "Successfully retrieved JWT Token." -ForegroundColor Green
+        $env:JWT_TOKENS = $tokenList -join ","
+        $env:JWT_TOKEN = $tokenList[0] # Fallback for backward compatibility
+        Write-Host "Successfully retrieved $($tokenList.Count) JWT Tokens." -ForegroundColor Green
     } catch {
-        Write-Error "Failed to fetch JWT Token from Keycloak: $_"
+        Write-Error "Failed to fetch JWT Tokens from Keycloak: $_"
     }
 }
 

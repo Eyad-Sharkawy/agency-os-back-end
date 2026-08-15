@@ -7,6 +7,12 @@ if [[ "$TYPE" != "project" && "$TYPE" != "workflow" && "$TYPE" != "all" && "$TYP
   exit 1
 fi
 
+# Clear cached environment variables to prevent leakage from previous runs in the active shell session
+unset TENANT_IDS
+unset TENANT_ID
+unset JWT_TOKEN
+unset JWT_TOKENS
+
 # 1. Load .env file from root directory
 ENV_FILE="../.env"
 HAS_MANUAL_TOKEN=false
@@ -26,28 +32,49 @@ else
   echo "Warning: .env file not found at $ENV_FILE"
 fi
 
-# 2. Get JWT Token from Keycloak programmatically if not manually set in .env
+# 2. Get JWT Tokens from Keycloak programmatically if not manually set in .env
 CLIENT_ID="${KEYCLOAK_TEST_CLIENT_ID:-$KEYCLOAK_FRONTEND_CLIENT_ID}"
-if [ "$HAS_MANUAL_TOKEN" = false ] && [ -n "$KEYCLOAK_ISSUER_URI" ] && [ -n "$CLIENT_ID" ] && [ -n "$TEST_USER_USERNAME" ] && [ -n "$TEST_USER_PASSWORD" ]; then
-  echo "Fetching JWT Token from Keycloak..."
+USERNAMES_STR="${TEST_USER_USERNAMES:-$TEST_USER_USERNAME}"
+
+if [ "$HAS_MANUAL_TOKEN" = false ] && [ -n "$KEYCLOAK_ISSUER_URI" ] && [ -n "$CLIENT_ID" ] && [ -n "$USERNAMES_STR" ] && [ -n "$TEST_USER_PASSWORD" ]; then
+  echo "Fetching JWT Tokens from Keycloak for users: $USERNAMES_STR..."
   SECRET_PARAM=""
   if [ -n "$KEYCLOAK_TEST_CLIENT_SECRET" ]; then
     SECRET_PARAM="-d client_secret=${KEYCLOAK_TEST_CLIENT_SECRET}"
   fi
-  TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
-    -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "grant_type=password" \
-    -d "client_id=${CLIENT_ID}" \
-    -d "username=${TEST_USER_USERNAME}" \
-    -d "password=${TEST_USER_PASSWORD}" \
-    $SECRET_PARAM)
+
+  # Split usernames by comma
+  IFS=',' read -r -a usernames_array <<< "$USERNAMES_STR"
+  TOKENS_LIST=""
+  for username in "${usernames_array[@]}"; do
+    username_trimmed=$(echo "$username" | xargs)
+    if [ -z "$username_trimmed" ]; then
+      continue
+    fi
+    TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "grant_type=password" \
+      -d "client_id=${CLIENT_ID}" \
+      -d "username=${username_trimmed}" \
+      -d "password=${TEST_USER_PASSWORD}" \
+      $SECRET_PARAM)
+    
+    SINGLE_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+    if [ -n "$SINGLE_TOKEN" ]; then
+      if [ -z "$TOKENS_LIST" ]; then
+        TOKENS_LIST="$SINGLE_TOKEN"
+      else
+        TOKENS_LIST="${TOKENS_LIST},${SINGLE_TOKEN}"
+      fi
+    else
+      echo "Error: Failed to fetch token for user $username_trimmed. Response was: $TOKEN_RES"
+    fi
+  done
   
-  JWT_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
-  if [ -n "$JWT_TOKEN" ]; then
-    export JWT_TOKEN
-    echo "Successfully retrieved JWT Token."
-  else
-    echo "Error: Failed to fetch JWT Token from Keycloak. Response was: $TOKEN_RES"
+  if [ -n "$TOKENS_LIST" ]; then
+    export JWT_TOKENS="$TOKENS_LIST"
+    export JWT_TOKEN=$(echo "$TOKENS_LIST" | cut -d',' -f1) # Fallback for backward compatibility
+    echo "Successfully retrieved JWT Tokens."
   fi
 fi
 

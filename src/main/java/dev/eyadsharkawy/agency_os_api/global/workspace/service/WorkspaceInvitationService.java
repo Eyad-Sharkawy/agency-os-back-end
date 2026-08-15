@@ -184,6 +184,12 @@ public class WorkspaceInvitationService {
 
     invitation.setStatus(InvitationStatus.ACCEPTED);
     invitationRepository.save(invitation);
+
+    // Manually set ID values in the composite key and save directly to prevent cascading issues
+    membership.getId().setUserId(user.getId());
+    membership.getId().setWorkspaceId(invitation.getWorkspace().getId());
+    userWorkspaceRepository.save(membership);
+
     log.info(
         "User [{}] accepted invitation for workspace [{}]",
         user.getUsername(),

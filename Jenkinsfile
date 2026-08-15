@@ -124,23 +124,39 @@ pipeline {
                               curlimages/curl -s --retry 15 --retry-delay 2 --retry-connrefused http://agency-os-staging:8080/api/v1/workspaces > /dev/null || true
                             echo "Staging backend is ready! Starting stress tests..."
 
-                            # 6. Fetch JWT token programmatically from Keycloak via credentials
-                            TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
-                              -H "Content-Type: application/x-www-form-urlencoded" \
-                              -d "grant_type=password" \
-                              -d "client_id=${KEYCLOAK_CLIENT_ID}" \
-                              -d "client_secret=${KEYCLOAK_CLIENT_SECRET}" \
-                              -d "username=${TEST_USER_CREDS_USR}" \
-                              -d "password=${TEST_USER_CREDS_PSW}")
-                            
-                            JWT_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+                            # 6. Fetch JWT tokens programmatically from Keycloak for all 5 users
+                            echo "Fetching tokens for test users..."
+                            JWT_TOKENS=""
+                            for i in "" "_2" "_3" "_4" "_5"; do
+                                USERNAME="${TEST_USER_CREDS_USR}${i}"
+                                TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
+                                  -H "Content-Type: application/x-www-form-urlencoded" \
+                                  -d "grant_type=password" \
+                                  -d "client_id=${KEYCLOAK_CLIENT_ID}" \
+                                  -d "client_secret=${KEYCLOAK_CLIENT_SECRET}" \
+                                  -d "username=${USERNAME}" \
+                                  -d "password=${TEST_USER_CREDS_PSW}")
+                                
+                                SINGLE_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+                                if [ -n "$SINGLE_TOKEN" ]; then
+                                    if [ -z "$JWT_TOKENS" ]; then
+                                        JWT_TOKENS="$SINGLE_TOKEN"
+                                    else
+                                        JWT_TOKENS="${JWT_TOKENS},${SINGLE_TOKEN}"
+                                    fi
+                                else
+                                    echo "Error: Failed to fetch token for user ${USERNAME}"
+                                    exit 1
+                                fi
+                            done
+                            echo "Retrieved tokens successfully."
  
                             # 7. Run k6 database seeder (will dynamically create workspaces and seed data!)
                             echo "Seeding the empty staging database..."
                             docker run --rm \
                               --network agency-os-net \
                               -e API_URL="http://agency-os-staging:8080" \
-                              -e JWT_TOKEN="$JWT_TOKEN" \
+                              -e JWT_TOKENS="$JWT_TOKENS" \
                               -e TENANT_IDS="" \
                               -e TENANT_ID="" \
                               -v "$(pwd)/stress-tests:/stress-tests" \
@@ -151,7 +167,7 @@ pipeline {
                             docker run --rm \
                               --network agency-os-net \
                               -e API_URL="http://agency-os-staging:8080" \
-                              -e JWT_TOKEN="$JWT_TOKEN" \
+                              -e JWT_TOKENS="$JWT_TOKENS" \
                               -e TENANT_IDS="" \
                               -e TENANT_ID="" \
                               -v "$(pwd)/stress-tests:/stress-tests" \
@@ -162,7 +178,7 @@ pipeline {
                             docker run --rm \
                               --network agency-os-net \
                               -e API_URL="http://agency-os-staging:8080" \
-                              -e JWT_TOKEN="$JWT_TOKEN" \
+                              -e JWT_TOKENS="$JWT_TOKENS" \
                               -e TENANT_IDS="" \
                               -e TENANT_ID="" \
                               -v "$(pwd)/stress-tests:/stress-tests" \
