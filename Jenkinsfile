@@ -100,6 +100,14 @@ pipeline {
                     }
                     steps {
                         sh '''
+                            # 1. Wait for the backend container to be fully initialized and healthy
+                            echo "Waiting for backend container to start..."
+                            docker run --rm \
+                              --network agency-os-net \
+                              curlimages/curl -s --retry 15 --retry-delay 2 --retry-connrefused http://agency-os:8080/api/v1/workspaces > /dev/null || true
+                            echo "Backend is ready! Starting stress tests..."
+
+                            # 2. Fetch JWT token programmatically from Keycloak via credentials
                             TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
                               -H "Content-Type: application/x-www-form-urlencoded" \
                               -d "grant_type=password" \
@@ -109,8 +117,8 @@ pipeline {
                               -d "password=${TEST_USER_CREDS_PSW}")
                             
                             JWT_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
-
-                            # 2. Run k6 read-stress test (project-load-test.js)
+ 
+                             # 3. Run k6 read-stress test (project-load-test.js)
                             FIRST_TENANT=$(echo "${TEST_TENANTS}" | cut -d',' -f1)
                             docker run --rm \
                               --network agency-os-net \
