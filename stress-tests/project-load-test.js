@@ -20,16 +20,60 @@ export const options = {
 const BASE_URL = __ENV.API_URL || 'http://localhost:8080';
 const AUTH_TOKEN = __ENV.JWT_TOKEN || '';
 
-// Parse workspace tenant: use TENANT_ID or the first element from TENANT_IDS list
-const TENANT_ID_ENV = __ENV.TENANT_ID || __ENV.TENANT_IDS || 'test_workspace_tenant';
-const TENANT_ID = TENANT_ID_ENV.split(',')[0].trim();
+export function setup() {
+  const TENANTS_ENV = __ENV.TENANT_IDS || __ENV.TENANT_ID || '';
+  if (TENANTS_ENV) {
+    return { tenants: TENANTS_ENV.split(',').map(s => s.trim()) };
+  }
 
-export default function () {
+  if (!AUTH_TOKEN) {
+    console.error("JWT_TOKEN is required to run the read stress test!");
+    return { tenants: [] };
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${AUTH_TOKEN}`,
+  };
+
+  // 1. Fetch user's existing workspaces (populated by the seeder)
+  console.log("No TENANT_IDS provided. Querying active user workspaces...");
+  const listRes = http.get(`${BASE_URL}/api/v1/workspaces`, { headers });
+  if (listRes.status === 200) {
+    const workspaces = JSON.parse(listRes.body);
+    if (workspaces.length > 0) {
+      const activeTenants = workspaces.map(w => w.tenantId);
+      console.log(`Found active workspaces: ${JSON.stringify(activeTenants)}`);
+      return { tenants: activeTenants };
+    }
+  }
+
+  // 2. Fallback: Create a dynamic staging workspace if database is empty
+  console.log("No active workspaces found. Creating a dynamic staging workspace...");
+  const createRes = http.post(`${BASE_URL}/api/v1/workspaces`, JSON.stringify({ name: 'Staging Workspace' }), { headers });
+  if (createRes.status === 201) {
+    const workspace = JSON.parse(createRes.body);
+    console.log(`Created staging workspace: ${workspace.tenantId}`);
+    return { tenants: [workspace.tenantId] };
+  }
+
+  throw new Error("Failed to resolve or initialize any staging workspaces!");
+}
+
+export default function (data) {
+  const tenants = data.tenants;
+  if (!tenants || tenants.length === 0) {
+    console.error("No active workspaces available for read stress test!");
+    return;
+  }
+
+  const tenantId = tenants[__VU % tenants.length];
+
   // Setup headers required for the multi-tenant secure endpoint
   const params = {
     headers: {
       'Content-Type': 'application/json',
-      'X-Tenant-ID': TENANT_ID,
+      'X-Tenant-ID': tenantId,
       'Authorization': AUTH_TOKEN ? `Bearer ${AUTH_TOKEN}` : '',
     },
   };

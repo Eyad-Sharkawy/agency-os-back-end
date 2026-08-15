@@ -73,6 +73,112 @@ pipeline {
                     }
                 }
 
+                stage('Performance Verification') {
+                    when {
+                        branch 'main'
+                    }
+                    environment {
+                        TEST_USER_CREDS = credentials('agency-os-keycloak-test-user')
+                        KEYCLOAK_CLIENT_SECRET = credentials('agency-os-keycloak-test-client-secret')
+                        KEYCLOAK_CLIENT_ID = 'agency-os-test'
+                    }
+                    steps {
+                        sh '''
+                            # Remove any leftover containers from aborted runs
+                            docker rm -f agency-os-staging pg-perf-test || true
+
+                            # 1. Start a temporary staging database container
+                            echo "Starting staging database container..."
+                            docker run -d --name pg-perf-test \
+                              --network agency-os-net \
+                              -e POSTGRES_DB=agency_os \
+                              -e POSTGRES_USER=postgres \
+                              -e POSTGRES_PASSWORD=password \
+                              postgres:15-alpine
+
+                            # 2. Wait for staging database to be ready
+                            echo "Waiting for staging database to start..."
+                            until docker exec pg-perf-test pg_isready -U postgres > /dev/null 2>&1; do
+                                sleep 1
+                            done
+                            echo "Staging database is ready!"
+
+                            # 3. Build staging backend container image
+                            echo "Building staging backend container..."
+                            docker build -t agency-os-staging:latest .
+
+                            # 4. Start staging backend container
+                            echo "Starting staging backend container..."
+                            docker run -d --name agency-os-staging \
+                              --network agency-os-net \
+                              -e SPRING_DATASOURCE_URL="jdbc:postgresql://pg-perf-test:5432/agency_os" \
+                              -e SPRING_DATASOURCE_USERNAME="postgres" \
+                              -e SPRING_DATASOURCE_PASSWORD="password" \
+                              -e KEYCLOAK_ISSUER_URI="${KEYCLOAK_ISSUER_URI}" \
+                              agency-os-staging:latest
+
+                            # 5. Wait for the staging backend container to be fully initialized and healthy
+                            echo "Waiting for staging backend container to start..."
+                            docker run --rm \
+                              --network agency-os-net \
+                              curlimages/curl -s --retry 15 --retry-delay 2 --retry-connrefused http://agency-os-staging:8080/api/v1/workspaces > /dev/null || true
+                            echo "Staging backend is ready! Starting stress tests..."
+
+                            # 6. Fetch JWT token programmatically from Keycloak via credentials
+                            TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
+                              -H "Content-Type: application/x-www-form-urlencoded" \
+                              -d "grant_type=password" \
+                              -d "client_id=${KEYCLOAK_CLIENT_ID}" \
+                              -d "client_secret=${KEYCLOAK_CLIENT_SECRET}" \
+                              -d "username=${TEST_USER_CREDS_USR}" \
+                              -d "password=${TEST_USER_CREDS_PSW}")
+                            
+                            JWT_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+ 
+                            # 7. Run k6 database seeder (will dynamically create workspaces and seed data!)
+                            echo "Seeding the empty staging database..."
+                            docker run --rm \
+                              --network agency-os-net \
+                              -e API_URL="http://agency-os-staging:8080" \
+                              -e JWT_TOKEN="$JWT_TOKEN" \
+                              -e TENANT_IDS="" \
+                              -e TENANT_ID="" \
+                              -v "$(pwd)/stress-tests:/stress-tests" \
+                              grafana/k6 run /stress-tests/seed-data.js
+
+                            # 8. Run k6 read-stress test (project-load-test.js)
+                            echo "Running project read stress test..."
+                            docker run --rm \
+                              --network agency-os-net \
+                              -e API_URL="http://agency-os-staging:8080" \
+                              -e JWT_TOKEN="$JWT_TOKEN" \
+                              -e TENANT_IDS="" \
+                              -e TENANT_ID="" \
+                              -v "$(pwd)/stress-tests:/stress-tests" \
+                              grafana/k6 run /stress-tests/project-load-test.js
+
+                            # 9. Run k6 E2E workflow stress test (workflow-load-test.js)
+                            echo "Running E2E workflow stress test..."
+                            docker run --rm \
+                              --network agency-os-net \
+                              -e API_URL="http://agency-os-staging:8080" \
+                              -e JWT_TOKEN="$JWT_TOKEN" \
+                              -e TENANT_IDS="" \
+                              -e TENANT_ID="" \
+                              -v "$(pwd)/stress-tests:/stress-tests" \
+                              grafana/k6 run /stress-tests/workflow-load-test.js
+                        '''
+                    }
+                    post {
+                        always {
+                            sh '''
+                                echo "Cleaning up staging containers..."
+                                docker rm -f agency-os-staging pg-perf-test || true
+                            '''
+                        }
+                    }
+                }
+
                 stage('Deploy to Server') {
                     when {
                         branch 'main'
@@ -84,58 +190,6 @@ pipeline {
                             cd /home/ubuntu/agency-os-back-end
                             docker compose down
                             docker compose up -d --build
-                        '''
-                    }
-                }
-
-                stage('Performance Verification') {
-                    when {
-                        branch 'main'
-                    }
-                    environment {
-                        TEST_USER_CREDS = credentials('agency-os-keycloak-test-user')
-                        KEYCLOAK_CLIENT_SECRET = credentials('agency-os-keycloak-test-client-secret')
-                        KEYCLOAK_CLIENT_ID = 'agency-os-test'
-                        TEST_TENANTS = 'tenant_test_1_02f836,tenant_test_2_3596a7,tenant_test_3_b5aac1'
-                    }
-                    steps {
-                        sh '''
-                            # 1. Wait for the backend container to be fully initialized and healthy
-                            echo "Waiting for backend container to start..."
-                            docker run --rm \
-                              --network agency-os-net \
-                              curlimages/curl -s --retry 15 --retry-delay 2 --retry-connrefused http://agency-os:8080/api/v1/workspaces > /dev/null || true
-                            echo "Backend is ready! Starting stress tests..."
-
-                            # 2. Fetch JWT token programmatically from Keycloak via credentials
-                            TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
-                              -H "Content-Type: application/x-www-form-urlencoded" \
-                              -d "grant_type=password" \
-                              -d "client_id=${KEYCLOAK_CLIENT_ID}" \
-                              -d "client_secret=${KEYCLOAK_CLIENT_SECRET}" \
-                              -d "username=${TEST_USER_CREDS_USR}" \
-                              -d "password=${TEST_USER_CREDS_PSW}")
-                            
-                            JWT_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
- 
-                             # 3. Run k6 read-stress test (project-load-test.js)
-                            FIRST_TENANT=$(echo "${TEST_TENANTS}" | cut -d',' -f1)
-                            docker run --rm \
-                              --network agency-os-net \
-                              -e API_URL="http://agency-os:8080" \
-                              -e JWT_TOKEN="$JWT_TOKEN" \
-                              -e TENANT_ID="$FIRST_TENANT" \
-                              -v "$(pwd)/stress-tests:/stress-tests" \
-                              grafana/k6 run /stress-tests/project-load-test.js
-
-                            # 3. Run k6 E2E workflow stress test (workflow-load-test.js)
-                            docker run --rm \
-                              --network agency-os-net \
-                              -e API_URL="http://agency-os:8080" \
-                              -e JWT_TOKEN="$JWT_TOKEN" \
-                              -e TENANT_IDS="${TEST_TENANTS}" \
-                              -v "$(pwd)/stress-tests:/stress-tests" \
-                              grafana/k6 run /stress-tests/workflow-load-test.js
                         '''
                     }
                 }

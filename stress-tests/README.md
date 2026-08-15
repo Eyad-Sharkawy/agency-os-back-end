@@ -102,7 +102,7 @@ JWT_TOKEN="your_jwt_token_here" TENANT_ID="your_tenant_id_here" k6 run project-l
 #### Option B: Multi-Workspace Workflow Stress Test (`workflow-load-test.js`)
 Tests real-world end-to-end scenarios (creating clients, creating projects, creating tasks, logging time, and listing resources) distributed across multiple dynamic tenant schemas concurrently.
 ```bash
-# PowerShell
+# PowerShell (Optional: if TENANT_IDS is omitted, k6 automatically creates/discovers workspaces!)
 $env:JWT_TOKEN="your_jwt_token_here"
 $env:TENANT_IDS="workspace_tenant_a,workspace_tenant_b,workspace_tenant_c"
 k6 run workflow-load-test.js

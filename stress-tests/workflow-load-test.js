@@ -19,10 +19,6 @@ export const options = {
 const BASE_URL = __ENV.API_URL || 'http://localhost:8080';
 const AUTH_TOKEN = __ENV.JWT_TOKEN || '';
 
-// Parse comma-separated list of active workspaces/tenants (e.g. TENANT_IDS="tenant1,tenant2")
-const TENANTS_ENV = __ENV.TENANT_IDS || __ENV.TENANT_ID || 'test_workspace_tenant';
-const TENANTS = TENANTS_ENV.split(',').map(s => s.trim());
-
 // Helper function to decode Keycloak User ID (sub) from JWT
 function getUserIdFromToken(token) {
   try {
@@ -40,14 +36,69 @@ function getUserIdFromToken(token) {
 
 const KEYCLOAK_USER_ID = getUserIdFromToken(AUTH_TOKEN);
 
-export default function () {
+export function setup() {
+  const TENANTS_ENV = __ENV.TENANT_IDS || __ENV.TENANT_ID || '';
+  if (TENANTS_ENV) {
+    return { tenants: TENANTS_ENV.split(',').map(s => s.trim()) };
+  }
+
+  if (!AUTH_TOKEN) {
+    console.error("JWT_TOKEN is required to run the workflow stress test!");
+    return { tenants: [] };
+  }
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${AUTH_TOKEN}`,
+  };
+
+  // 1. Fetch user's existing workspaces (populated by the seeder)
+  console.log("No TENANT_IDS provided. Querying active user workspaces...");
+  const listRes = http.get(`${BASE_URL}/api/v1/workspaces`, { headers });
+  if (listRes.status === 200) {
+    const workspaces = JSON.parse(listRes.body);
+    if (workspaces.length > 0) {
+      const activeTenants = workspaces.map(w => w.tenantId);
+      console.log(`Found active workspaces: ${JSON.stringify(activeTenants)}`);
+      return { tenants: activeTenants };
+    }
+  }
+
+  // 2. Fallback: Create 3 dynamic staging workspaces if database is empty
+  console.log("No active workspaces found. Creating 3 dynamic staging workspaces...");
+  const createdTenants = [];
+  for (let i = 1; i <= 3; i++) {
+    const res = http.post(`${BASE_URL}/api/v1/workspaces`, JSON.stringify({ name: `Staging Workspace ${i}` }), { headers });
+    if (res.status === 201) {
+      const workspace = JSON.parse(res.body);
+      createdTenants.push(workspace.tenantId);
+    } else {
+      console.error(`Failed to create staging workspace ${i}: ${res.status} - ${res.body}`);
+    }
+  }
+
+  if (createdTenants.length === 0) {
+    throw new Error("Failed to initialize any staging workspaces!");
+  }
+
+  console.log(`Initialized staging workspaces: ${JSON.stringify(createdTenants)}`);
+  return { tenants: createdTenants };
+}
+
+export default function (data) {
   if (!AUTH_TOKEN) {
     console.error("JWT_TOKEN is required to run the workflow stress test!");
     return;
   }
 
+  const tenants = data.tenants;
+  if (!tenants || tenants.length === 0) {
+    console.error("No active workspaces available for workflow stress test!");
+    return;
+  }
+
   // Assign this VU to a specific tenant randomly (to test multi-schema routing concurrency)
-  const tenantId = TENANTS[__VU % TENANTS.length];
+  const tenantId = tenants[__VU % tenants.length];
   
   const headers = {
     'Content-Type': 'application/json',
