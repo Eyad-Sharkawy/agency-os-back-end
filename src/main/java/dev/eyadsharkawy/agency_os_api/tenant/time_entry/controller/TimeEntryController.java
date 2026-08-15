@@ -34,6 +34,8 @@ import org.springframework.web.bind.annotation.*;
         "Endpoints for manual time logging, start/stop stopwatch timers, and WebSocket broadcast integrations")
 public class TimeEntryController {
 
+  private static final String TOPIC_PREFIX = "/topic/";
+
   private final TimeEntryService timeEntryService;
   private final WebSocketBroadcastService broadcastService;
 
@@ -48,7 +50,7 @@ public class TimeEntryController {
     TimeEntryResponse response = timeEntryService.logTimeManually(jwt, request);
 
     String tenantId = TenantContextHolder.getTenantId();
-    broadcastService.broadcast("/topic/" + tenantId + "/time-entries", response);
+    broadcastService.broadcast(TOPIC_PREFIX + tenantId + "/time-entries", response);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
@@ -65,7 +67,7 @@ public class TimeEntryController {
     ActiveTimerResponse response = timeEntryService.startTimer(jwt, taskId);
 
     String tenantId = TenantContextHolder.getTenantId();
-    broadcastService.broadcast("/topic/" + tenantId + "/timers/start", response);
+    broadcastService.broadcast(TOPIC_PREFIX + tenantId + "/timers/start", response);
 
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
@@ -83,7 +85,7 @@ public class TimeEntryController {
     TimeEntryResponse response = timeEntryService.stopTimer(jwt, isBillable);
 
     String tenantId = TenantContextHolder.getTenantId();
-    broadcastService.broadcast("/topic/" + tenantId + "/timers/stop", response);
+    broadcastService.broadcast(TOPIC_PREFIX + tenantId + "/timers/stop", response);
 
     return ResponseEntity.ok(response);
   }

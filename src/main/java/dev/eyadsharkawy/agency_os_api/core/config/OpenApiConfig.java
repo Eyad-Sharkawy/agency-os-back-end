@@ -2,6 +2,8 @@ package dev.eyadsharkawy.agency_os_api.core.config;
 
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.responses.ApiResponse;
@@ -107,34 +109,33 @@ public class OpenApiConfig {
   public OpenApiCustomizer globalSecurityResponsesCustomizer() {
     return openApi -> {
       if (openApi.getPaths() != null) {
-        openApi
-            .getPaths()
-            .forEach(
-                (pathKey, pathItem) ->
-                    pathItem
-                        .readOperations()
-                        .forEach(
-                            operation -> {
-                              ApiResponses responses = operation.getResponses();
-                              if (responses != null) {
-                                if (!responses.containsKey("401")) {
-                                  responses.addApiResponse(
-                                      "401",
-                                      new ApiResponse()
-                                          .description(
-                                              "Unauthorized - Full authentication is required to access this resource"));
-                                }
-                                if (!responses.containsKey("403")) {
-                                  responses.addApiResponse(
-                                      "403",
-                                      new ApiResponse()
-                                          .description(
-                                              "Forbidden - Insufficient permissions to access this resource"));
-                                }
-                              }
-                            }));
+        openApi.getPaths().values().forEach(this::addSecurityResponsesToPathItem);
       }
     };
+  }
+
+  private void addSecurityResponsesToPathItem(PathItem pathItem) {
+    if (pathItem != null && pathItem.readOperations() != null) {
+      pathItem.readOperations().forEach(this::addSecurityResponsesToOperation);
+    }
+  }
+
+  private void addSecurityResponsesToOperation(Operation operation) {
+    ApiResponses responses = operation.getResponses();
+    if (responses == null) {
+      return;
+    }
+    addResponseIfNotPresent(
+        responses, "401", "Unauthorized - Full authentication is required to access this resource");
+    addResponseIfNotPresent(
+        responses, "403", "Forbidden - Insufficient permissions to access this resource");
+  }
+
+  private void addResponseIfNotPresent(
+      ApiResponses responses, String statusCode, String description) {
+    if (!responses.containsKey(statusCode)) {
+      responses.addApiResponse(statusCode, new ApiResponse().description(description));
+    }
   }
 
   /**
