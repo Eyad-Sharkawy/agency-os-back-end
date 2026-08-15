@@ -28,6 +28,7 @@ public class TaskController {
   private final TaskService taskService;
 
   @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN')")
   @Operation(
       summary = "Create task",
@@ -111,6 +112,7 @@ public class TaskController {
   }
 
   @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN')")
   @Operation(
       summary = "Delete task",

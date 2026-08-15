@@ -27,6 +27,7 @@ public class ClientController {
   private final ClientService clientService;
 
   @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN')")
   @Operation(
       summary = "Create client company",
@@ -74,6 +75,7 @@ public class ClientController {
   }
 
   @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("@workspaceSecurity.hasRole('OWNER')")
   @Operation(
       summary = "Delete client company",

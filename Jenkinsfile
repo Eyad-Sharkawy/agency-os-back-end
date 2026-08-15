@@ -87,6 +87,50 @@ pipeline {
                         '''
                     }
                 }
+
+                stage('Performance Verification') {
+                    when {
+                        branch 'main'
+                    }
+                    environment {
+                        TEST_USER_CREDS = credentials('agency-os-keycloak-test-user')
+                        KEYCLOAK_CLIENT_SECRET = credentials('agency-os-keycloak-test-client-secret')
+                        KEYCLOAK_CLIENT_ID = 'agency-os-test'
+                        TEST_TENANTS = 'tenant_test_1_02f836,tenant_test_2_3596a7,tenant_test_3_b5aac1'
+                    }
+                    steps {
+                        sh '''
+                            TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
+                              -H "Content-Type: application/x-www-form-urlencoded" \
+                              -d "grant_type=password" \
+                              -d "client_id=${KEYCLOAK_CLIENT_ID}" \
+                              -d "client_secret=${KEYCLOAK_CLIENT_SECRET}" \
+                              -d "username=${TEST_USER_CREDS_USR}" \
+                              -d "password=${TEST_USER_CREDS_PSW}")
+                            
+                            JWT_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+
+                            # 2. Run k6 read-stress test (project-load-test.js)
+                            FIRST_TENANT=$(echo "${TEST_TENANTS}" | cut -d',' -f1)
+                            docker run --rm \
+                              --network agency-os-net \
+                              -e API_URL="http://agency-os:8080" \
+                              -e JWT_TOKEN="$JWT_TOKEN" \
+                              -e TENANT_ID="$FIRST_TENANT" \
+                              -v "$(pwd)/stress-tests:/stress-tests" \
+                              grafana/k6 run /stress-tests/project-load-test.js
+
+                            # 3. Run k6 E2E workflow stress test (workflow-load-test.js)
+                            docker run --rm \
+                              --network agency-os-net \
+                              -e API_URL="http://agency-os:8080" \
+                              -e JWT_TOKEN="$JWT_TOKEN" \
+                              -e TENANT_IDS="${TEST_TENANTS}" \
+                              -v "$(pwd)/stress-tests:/stress-tests" \
+                              grafana/k6 run /stress-tests/workflow-load-test.js
+                        '''
+                    }
+                }
             }
         }
     }

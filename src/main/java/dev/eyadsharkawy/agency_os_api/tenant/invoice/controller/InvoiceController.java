@@ -26,6 +26,7 @@ public class InvoiceController {
   private final InvoiceService invoiceService;
 
   @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@workspaceSecurity.hasRole('OWNER')")
   @Operation(
       summary = "Create invoice",
@@ -84,6 +85,7 @@ public class InvoiceController {
   }
 
   @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("@workspaceSecurity.hasRole('OWNER')")
   @Operation(
       summary = "Delete invoice",

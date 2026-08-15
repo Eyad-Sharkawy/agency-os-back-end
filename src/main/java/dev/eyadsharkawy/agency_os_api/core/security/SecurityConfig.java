@@ -20,6 +20,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @RequiredArgsConstructor
 public class SecurityConfig {
   private final TenantSecurityFilter tenantSecurityFilter;
+  private final CustomAuthenticationEntryPoint authenticationEntryPoint;
+  private final CustomAccessDeniedHandler accessDeniedHandler;
 
   @Value("${app.cors.allowed-origins}")
   private List<String> allowedOrigins;
@@ -44,7 +46,17 @@ public class SecurityConfig {
                     .permitAll()
                     .anyRequest()
                     .authenticated())
-        .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+        .oauth2ResourceServer(
+            oauth2 ->
+                oauth2
+                    .jwt(Customizer.withDefaults())
+                    .authenticationEntryPoint(authenticationEntryPoint)
+                    .accessDeniedHandler(accessDeniedHandler))
+        .exceptionHandling(
+            exceptions ->
+                exceptions
+                    .authenticationEntryPoint(authenticationEntryPoint)
+                    .accessDeniedHandler(accessDeniedHandler));
 
     httpSecurity.addFilterAfter(
         tenantSecurityFilter,

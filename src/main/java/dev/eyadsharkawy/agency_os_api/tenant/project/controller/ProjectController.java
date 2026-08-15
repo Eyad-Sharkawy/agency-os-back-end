@@ -27,6 +27,7 @@ public class ProjectController {
   private final ProjectService projectService;
 
   @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
   @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN')")
   @Operation(
       summary = "Create project",
@@ -86,6 +87,7 @@ public class ProjectController {
   }
 
   @DeleteMapping("/{id}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("@workspaceSecurity.hasRole('OWNER')")
   @Operation(
       summary = "Delete project",

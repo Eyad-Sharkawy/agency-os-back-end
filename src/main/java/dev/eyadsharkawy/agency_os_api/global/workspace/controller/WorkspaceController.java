@@ -28,6 +28,7 @@ public class WorkspaceController {
   private final WorkspaceService workspaceService;
 
   @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
   @Operation(
       summary = "Create workspace",
       description =
@@ -65,6 +66,7 @@ public class WorkspaceController {
   }
 
   @DeleteMapping("/{tenantId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER')")
   @Operation(
       summary = "Delete workspace",
@@ -105,6 +107,7 @@ public class WorkspaceController {
   }
 
   @DeleteMapping("/{tenantId}/members/{userId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
   @PreAuthorize("@workspaceSecurity.hasRoleInTenant(#tenantId, 'OWNER', 'ADMIN')")
   @Operation(
       summary = "Remove member from workspace",

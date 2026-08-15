@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.eyadsharkawy.agency_os_api.core.config.JacksonConfig;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantSecurityFilter;
 import dev.eyadsharkawy.agency_os_api.core.security.WorkspaceSecurity;
+import dev.eyadsharkawy.agency_os_api.shared.service.WebSocketBroadcastService;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.dto.ActiveTimerResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.dto.TimeEntryRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.dto.TimeEntryResponse;
@@ -25,7 +26,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,7 +38,7 @@ public class TimeEntryControllerTest {
 
   @MockitoBean private TimeEntryService timeEntryService;
 
-  @MockitoBean private SimpMessagingTemplate messagingTemplate;
+  @MockitoBean private WebSocketBroadcastService broadcastService;
 
   @MockitoBean(name = "workspaceSecurity")
   private WorkspaceSecurity workspaceSecurity;

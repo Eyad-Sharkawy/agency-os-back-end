@@ -4,6 +4,8 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.responses.ApiResponse;
+import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.*;
 import io.swagger.v3.oas.models.tags.Tag;
 import java.util.LinkedHashMap;
@@ -95,6 +97,44 @@ public class OpenApiConfig {
                         .type(SecurityScheme.Type.APIKEY)
                         .in(SecurityScheme.In.HEADER)
                         .description("Enter your active workspace tenant ID UUID")));
+  }
+
+  /**
+   * Automatically attaches 401 Unauthorized and 403 Forbidden response schemas to all documented
+   * operations.
+   */
+  @Bean
+  public OpenApiCustomizer globalSecurityResponsesCustomizer() {
+    return openApi -> {
+      if (openApi.getPaths() != null) {
+        openApi
+            .getPaths()
+            .forEach(
+                (pathKey, pathItem) ->
+                    pathItem
+                        .readOperations()
+                        .forEach(
+                            operation -> {
+                              ApiResponses responses = operation.getResponses();
+                              if (responses != null) {
+                                if (!responses.containsKey("401")) {
+                                  responses.addApiResponse(
+                                      "401",
+                                      new ApiResponse()
+                                          .description(
+                                              "Unauthorized - Full authentication is required to access this resource"));
+                                }
+                                if (!responses.containsKey("403")) {
+                                  responses.addApiResponse(
+                                      "403",
+                                      new ApiResponse()
+                                          .description(
+                                              "Forbidden - Insufficient permissions to access this resource"));
+                                }
+                              }
+                            }));
+      }
+    };
   }
 
   /**
