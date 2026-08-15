@@ -127,8 +127,8 @@ pipeline {
                             # 6. Fetch JWT tokens programmatically from Keycloak for all 5 users
                             echo "Fetching tokens for test users..."
                             JWT_TOKENS=""
-                            for i in "" "_2" "_3" "_4" "_5"; do
-                                USERNAME="${TEST_USER_CREDS_USR}${i}"
+                             for i in "1" "2" "3" "4" "5"; do
+                                 USERNAME="${TEST_USER_CREDS_USR}_${i}"
                                 TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
                                   -H "Content-Type: application/x-www-form-urlencoded" \
                                   -d "grant_type=password" \
