@@ -26,6 +26,7 @@ pipeline {
                     changeset 'mvnw.cmd'
                     changeset '.env'
                     changeset '.env.example'
+                    changeset 'stress-tests/**/*'
                 }
             }
             stages {
