@@ -91,6 +91,9 @@ export function setup() {
 
       // Self-healing: Ensure all other users are invited and joined to these workspaces
       for (const tenantId of activeTenants) {
+        const currentWorkspace = workspaces.find(w => w.tenantId === tenantId);
+        const workspaceUuid = currentWorkspace ? currentWorkspace.id : null;
+
         for (let i = 1; i < usersList.length; i++) {
           const invitee = usersList[i];
           const inviteeHeaders = {
@@ -150,7 +153,7 @@ export function setup() {
                 const pendingRes = http.get(`${BASE_URL}/api/v1/workspaces/invitations`, { headers: inviteeHeaders });
                 if (pendingRes.status === 200) {
                   const pendingInvites = JSON.parse(pendingRes.body);
-                  const inviteToAccept = pendingInvites.find(inv => inv.workspace.tenantId === tenantId);
+                  const inviteToAccept = pendingInvites.find(inv => inv.workspaceId === workspaceUuid);
                   if (inviteToAccept) {
                     const acceptRes = http.post(`${BASE_URL}/api/v1/workspaces/invitations/${inviteToAccept.id}/accept`, '', { headers: inviteeHeaders });
                     console.log(`Accept CLIENT invite ${inviteToAccept.id} for ${invitee.username} -> status: ${acceptRes.status}`);
@@ -169,7 +172,7 @@ export function setup() {
               const pendingRes = http.get(`${BASE_URL}/api/v1/workspaces/invitations`, { headers: inviteeHeaders });
               if (pendingRes.status === 200) {
                 const pendingInvites = JSON.parse(pendingRes.body);
-                const inviteToAccept = pendingInvites.find(inv => inv.workspace.tenantId === tenantId);
+                const inviteToAccept = pendingInvites.find(inv => inv.workspaceId === workspaceUuid);
                 if (inviteToAccept) {
                   const acceptRes = http.post(`${BASE_URL}/api/v1/workspaces/invitations/${inviteToAccept.id}/accept`, '', { headers: inviteeHeaders });
                   console.log(`Accept MEMBER invite ${inviteToAccept.id} for ${invitee.username} -> status: ${acceptRes.status}`);
