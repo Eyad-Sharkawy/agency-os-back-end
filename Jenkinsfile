@@ -189,6 +189,8 @@ pipeline {
                     post {
                         always {
                             sh '''
+                                echo "Staging backend logs:"
+                                docker logs agency-os-staging || true
                                 echo "Cleaning up staging containers..."
                                 docker rm -f agency-os-staging pg-perf-test || true
                             '''
