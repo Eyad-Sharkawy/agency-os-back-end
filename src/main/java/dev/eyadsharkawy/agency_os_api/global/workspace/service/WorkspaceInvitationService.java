@@ -10,10 +10,6 @@ import dev.eyadsharkawy.agency_os_api.global.workspace.entity.*;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceInvitationRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.ClientUser;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -31,8 +27,7 @@ public class WorkspaceInvitationService {
   private final WorkspaceRepository workspaceRepository;
   private final AppUserRepository userRepository;
   private final UserWorkspaceRepository userWorkspaceRepository;
-  private final ClientUserRepository clientUserRepository;
-  private final ClientRepository clientRepository;
+  private final ClientUserRegistrationService clientUserRegistrationService;
 
   @Transactional
   public WorkspaceInvitationResponse inviteUser(
@@ -164,19 +159,8 @@ public class WorkspaceInvitationService {
       String tenantId = invitation.getWorkspace().getTenantId();
       TenantContextHolder.setTenantId(tenantId);
       try {
-        Client client =
-            clientRepository
-                .findById(invitation.getClientId())
-                .orElseThrow(
-                    () ->
-                        new ResourceNotFoundException(
-                            "Client not found with id: " + invitation.getClientId()));
-
-        ClientUser clientUser = new ClientUser();
-        clientUser.setUserId(user.getKeycloakId());
-        clientUser.setClient(client);
-
-        clientUserRepository.save(clientUser);
+        clientUserRegistrationService.registerClientUser(
+            user.getKeycloakId(), invitation.getClientId());
       } finally {
         TenantContextHolder.clear();
       }

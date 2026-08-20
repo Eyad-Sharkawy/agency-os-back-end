@@ -16,10 +16,6 @@ import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceInvitationRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.ClientUser;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,8 +36,7 @@ class WorkspaceInvitationServiceTest {
   @Mock private WorkspaceRepository workspaceRepository;
   @Mock private AppUserRepository userRepository;
   @Mock private UserWorkspaceRepository userWorkspaceRepository;
-  @Mock private ClientUserRepository clientUserRepository;
-  @Mock private ClientRepository clientRepository;
+  @Mock private ClientUserRegistrationService clientUserRegistrationService;
 
   @InjectMocks private WorkspaceInvitationService invitationService;
 
@@ -227,8 +222,6 @@ class WorkspaceInvitationServiceTest {
   void acceptInvitation_ClientRole_Success() {
     UUID invId = UUID.randomUUID();
     UUID clientId = UUID.randomUUID();
-    Client client = new Client();
-    client.setId(clientId);
 
     WorkspaceInvitation inv = new WorkspaceInvitation();
     inv.setId(invId);
@@ -239,12 +232,11 @@ class WorkspaceInvitationServiceTest {
 
     when(invitationRepository.findById(invId)).thenReturn(Optional.of(inv));
     when(userRepository.findByKeycloakId("kc-inviter-123")).thenReturn(Optional.of(inviteeUser));
-    when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
 
     invitationService.acceptInvitation(inviterJwt, invId);
 
     assertThat(inv.getStatus()).isEqualTo(InvitationStatus.ACCEPTED);
-    verify(clientUserRepository, times(1)).save(any(ClientUser.class));
+    verify(clientUserRegistrationService, times(1)).registerClientUser("kc-invitee-456", clientId);
     verify(invitationRepository, times(1)).save(inv);
   }
 
