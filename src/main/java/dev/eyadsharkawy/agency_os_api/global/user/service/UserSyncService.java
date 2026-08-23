@@ -1,6 +1,5 @@
 package dev.eyadsharkawy.agency_os_api.global.user.service;
 
-import dev.eyadsharkawy.agency_os_api.global.user.dto.UserProfileResponse;
 import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.repository.AppUserRepository;
 import lombok.RequiredArgsConstructor;
@@ -60,18 +59,6 @@ public class UserSyncService {
               newUser.setLastName(lastName);
               return userRepository.save(newUser);
             });
-  }
-
-  @Transactional(readOnly = true)
-  public UserProfileResponse getCurrentUserProfile(Jwt jwt) {
-    AppUser user = getOrSyncUser(jwt);
-    return new UserProfileResponse(
-        user.getId(),
-        user.getKeycloakId(),
-        user.getUsername(),
-        user.getEmail(),
-        user.getFirstName(),
-        user.getLastName());
   }
 
   private String extractUsername(Jwt jwt) {

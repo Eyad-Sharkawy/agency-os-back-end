@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import dev.eyadsharkawy.agency_os_api.global.user.dto.UserProfileResponse;
 import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.repository.AppUserRepository;
 import java.util.Map;
@@ -93,20 +92,5 @@ class UserSyncServiceTest {
     assertThat(result.getEmail()).isEqualTo("jdoe@example.com");
     assertThat(result.getFirstName()).isEqualTo("John");
     verify(userRepository, times(1)).save(existingUser);
-  }
-
-  @Test
-  void getCurrentUserProfile_ShouldReturnMappedDto() {
-    when(userRepository.findByKeycloakId("kc-user-123")).thenReturn(Optional.of(existingUser));
-
-    UserProfileResponse response = userSyncService.getCurrentUserProfile(mockJwt);
-
-    assertThat(response).isNotNull();
-    assertThat(response.id()).isEqualTo(existingUser.getId());
-    assertThat(response.keycloakId()).isEqualTo("kc-user-123");
-    assertThat(response.username()).isEqualTo("jdoe");
-    assertThat(response.email()).isEqualTo("jdoe@example.com");
-    assertThat(response.firstName()).isEqualTo("John");
-    assertThat(response.lastName()).isEqualTo("Doe");
   }
 }

@@ -9,7 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import dev.eyadsharkawy.agency_os_api.core.config.JacksonConfig;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantSecurityFilter;
-import dev.eyadsharkawy.agency_os_api.global.user.dto.UserProfileResponse;
+import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.service.UserSyncService;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,10 +48,15 @@ class UserControllerTest {
   @Test
   void getCurrentUser_WhenAuthenticated_ShouldReturnUserProfile() throws Exception {
     UUID userId = UUID.randomUUID();
-    UserProfileResponse mockProfile =
-        new UserProfileResponse(userId, "kc-123", "jdoe", "jdoe@example.com", "John", "Doe");
+    AppUser mockUser = new AppUser();
+    mockUser.setId(userId);
+    mockUser.setKeycloakId("kc-123");
+    mockUser.setUsername("jdoe");
+    mockUser.setEmail("jdoe@example.com");
+    mockUser.setFirstName("John");
+    mockUser.setLastName("Doe");
 
-    when(userSyncService.getCurrentUserProfile(any())).thenReturn(mockProfile);
+    when(userSyncService.getOrSyncUser(any())).thenReturn(mockUser);
 
     mockMvc
         .perform(

@@ -1,6 +1,7 @@
 package dev.eyadsharkawy.agency_os_api.global.user.controller;
 
 import dev.eyadsharkawy.agency_os_api.global.user.dto.UserProfileResponse;
+import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.service.UserSyncService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,6 +36,7 @@ public class UserController {
       })
   @GetMapping("/me")
   public ResponseEntity<UserProfileResponse> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
-    return ResponseEntity.ok(userSyncService.getCurrentUserProfile(jwt));
+    AppUser user = userSyncService.getOrSyncUser(jwt);
+    return ResponseEntity.ok(UserProfileResponse.fromEntity(user));
   }
 }

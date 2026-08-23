@@ -1,5 +1,6 @@
 package dev.eyadsharkawy.agency_os_api.global.user.dto;
 
+import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 
@@ -18,4 +19,15 @@ public record UserProfileResponse(
     @Schema(description = "Keycloak preferred username", example = "john_doe") String username,
     @Schema(description = "Primary email address", example = "john.doe@agency.com") String email,
     @Schema(description = "First name", example = "John") String firstName,
-    @Schema(description = "Last name", example = "Doe") String lastName) {}
+    @Schema(description = "Last name", example = "Doe") String lastName) {
+
+  public static UserProfileResponse fromEntity(AppUser user) {
+    return new UserProfileResponse(
+        user.getId(),
+        user.getKeycloakId(),
+        user.getUsername(),
+        user.getEmail(),
+        user.getFirstName(),
+        user.getLastName());
+  }
+}
