@@ -4,6 +4,7 @@ import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.repository.AppUserRepository;
+import dev.eyadsharkawy.agency_os_api.global.user.service.UserSyncService;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceMemberResponse;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceMemberUpdateRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceRequest;
@@ -36,6 +37,7 @@ public class WorkspaceService {
 
   private final WorkspaceRepository workspaceRepository;
   private final AppUserRepository userRepository;
+  private final UserSyncService userSyncService;
   private final ApplicationEventPublisher eventPublisher;
   private final UserWorkspaceRepository userWorkspaceRepository;
   private final ClientUserRepository clientUserRepository;
@@ -46,8 +48,7 @@ public class WorkspaceService {
     String keycloakId = jwt.getSubject();
     log.info("Creating workspace [{}] for Keycloak user [{}]", request.name(), keycloakId);
 
-    AppUser user =
-        userRepository.findByKeycloakId(keycloakId).orElseGet(() -> syncUserFromJwt(jwt));
+    AppUser user = userSyncService.getOrSyncUser(jwt);
 
     String tenantId = generateTenantId(request.name());
 
@@ -279,20 +280,6 @@ public class WorkspaceService {
         tenantId,
         currentOwnerKeycloakId,
         newOwnerUserId);
-  }
-
-  private AppUser syncUserFromJwt(Jwt jwt) {
-    AppUser newUser = new AppUser();
-    newUser.setKeycloakId(jwt.getSubject());
-    newUser.setUsername(jwt.getClaimAsString("preferred_username"));
-    String email = jwt.getClaimAsString("email");
-    if (email == null || email.isBlank()) {
-      email = jwt.getClaimAsString("preferred_username") + "@agency.com";
-    }
-    newUser.setEmail(email);
-    newUser.setFirstName(jwt.getClaimAsString("given_name"));
-    newUser.setLastName(jwt.getClaimAsString("family_name"));
-    return newUser;
   }
 
   private String generateTenantId(String name) {

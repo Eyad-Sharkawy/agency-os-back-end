@@ -19,6 +19,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
+  private final UserSyncFilter userSyncFilter;
   private final TenantSecurityFilter tenantSecurityFilter;
   private final CustomAuthenticationEntryPoint authenticationEntryPoint;
   private final CustomAccessDeniedHandler accessDeniedHandler;
@@ -59,9 +60,11 @@ public class SecurityConfig {
                     .accessDeniedHandler(accessDeniedHandler));
 
     httpSecurity.addFilterAfter(
-        tenantSecurityFilter,
+        userSyncFilter,
         org.springframework.security.oauth2.server.resource.web.authentication
             .BearerTokenAuthenticationFilter.class);
+
+    httpSecurity.addFilterAfter(tenantSecurityFilter, UserSyncFilter.class);
 
     return httpSecurity.build();
   }

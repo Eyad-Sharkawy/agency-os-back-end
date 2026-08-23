@@ -4,6 +4,7 @@ import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.repository.AppUserRepository;
+import dev.eyadsharkawy.agency_os_api.global.user.service.UserSyncService;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceInvitationRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceInvitationResponse;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.*;
@@ -26,6 +27,7 @@ public class WorkspaceInvitationService {
   private final WorkspaceInvitationRepository invitationRepository;
   private final WorkspaceRepository workspaceRepository;
   private final AppUserRepository userRepository;
+  private final UserSyncService userSyncService;
   private final UserWorkspaceRepository userWorkspaceRepository;
   private final ClientUserRegistrationService clientUserRegistrationService;
 
@@ -43,22 +45,22 @@ public class WorkspaceInvitationService {
     if (request.username() != null && !request.username().isBlank())
       invitee =
           userRepository
-              .findByUsername(request.username())
+              .findByUsernameIgnoreCase(request.username().trim())
               .orElseThrow(
                   () ->
                       new ResourceNotFoundException(
-                          "User not found with username: " + request.username()));
+                          "User not found with username: " + request.username().trim()));
     else if (request.email() != null && !request.email().isBlank())
       invitee =
           userRepository
-              .findByEmail(request.email())
+              .findByEmailIgnoreCase(request.email().trim())
               .orElseThrow(
                   () ->
                       new ResourceNotFoundException(
-                          "User not found with username: " + request.email()));
+                          "User not found with email: " + request.email().trim()));
     else
       throw new IllegalArgumentException(
-          "Either username or username must be provided to invite a user.");
+          "Either username or email must be provided to invite a user.");
 
     if (request.role() != WorkspaceRole.MEMBER) {
       String inviterKeycloakId = inviterJwt.getSubject();
@@ -116,12 +118,7 @@ public class WorkspaceInvitationService {
 
   @Transactional(readOnly = true)
   public List<WorkspaceInvitationResponse> getPendingInvitations(Jwt jwt) {
-    String keycloakId = jwt.getSubject();
-    AppUser user =
-        userRepository
-            .findByKeycloakId(keycloakId)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
+    AppUser user = userSyncService.getOrSyncUser(jwt);
     return invitationRepository
         .findByUsernameIgnoreCaseAndStatus(user.getUsername(), InvitationStatus.PENDING)
         .stream()
@@ -138,11 +135,7 @@ public class WorkspaceInvitationService {
                 () ->
                     new ResourceNotFoundException("Invitation not found with id: " + invitationId));
 
-    String keycloakId = jwt.getSubject();
-    AppUser user =
-        userRepository
-            .findByKeycloakId(keycloakId)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    AppUser user = userSyncService.getOrSyncUser(jwt);
 
     if (!user.getUsername().equalsIgnoreCase(invitation.getUsername()))
       throw new IllegalArgumentException("You are not authorized to accept this invitation.");
@@ -189,17 +182,14 @@ public class WorkspaceInvitationService {
                 () ->
                     new ResourceNotFoundException("Invitation not found with id: " + invitationId));
 
-    String keycloakId = jwt.getSubject();
-    AppUser user =
-        userRepository
-            .findByKeycloakId(keycloakId)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    AppUser user = userSyncService.getOrSyncUser(jwt);
 
     if (!user.getUsername().equalsIgnoreCase(invitation.getUsername()))
       throw new IllegalArgumentException("You are not authorized to accept this invitation");
 
     invitation.setStatus(InvitationStatus.DECLINED);
     invitationRepository.save(invitation);
+
     log.info(
         "User [{}] declined invitation for workspace [{}]",
         user.getUsername(),

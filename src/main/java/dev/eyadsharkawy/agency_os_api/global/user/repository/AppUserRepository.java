@@ -10,11 +10,27 @@ public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
 
   boolean existsByKeycloakId(String keycloakId);
 
-  Optional<AppUser> findByEmail(String email);
+  Optional<AppUser> findByEmailIgnoreCase(String email);
 
-  Optional<AppUser> findByUsername(String email);
+  Optional<AppUser> findByUsernameIgnoreCase(String username);
 
-  boolean existsByEmail(String email);
+  boolean existsByEmailIgnoreCase(String email);
 
-  boolean existsByUsername(String username);
+  boolean existsByUsernameIgnoreCase(String username);
+
+  default Optional<AppUser> findByEmail(String email) {
+    return findByEmailIgnoreCase(email);
+  }
+
+  default Optional<AppUser> findByUsername(String username) {
+    return findByUsernameIgnoreCase(username);
+  }
+
+  default boolean existsByEmail(String email) {
+    return existsByEmailIgnoreCase(email);
+  }
+
+  default boolean existsByUsername(String username) {
+    return existsByUsernameIgnoreCase(username);
+  }
 }

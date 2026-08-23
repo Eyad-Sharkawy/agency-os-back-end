@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 
 import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.repository.AppUserRepository;
+import dev.eyadsharkawy.agency_os_api.global.user.service.UserSyncService;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceInvitationRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceInvitationResponse;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.InvitationStatus;
@@ -35,6 +36,7 @@ class WorkspaceInvitationServiceTest {
   @Mock private WorkspaceInvitationRepository invitationRepository;
   @Mock private WorkspaceRepository workspaceRepository;
   @Mock private AppUserRepository userRepository;
+  @Mock private UserSyncService userSyncService;
   @Mock private UserWorkspaceRepository userWorkspaceRepository;
   @Mock private ClientUserRegistrationService clientUserRegistrationService;
 
@@ -72,7 +74,7 @@ class WorkspaceInvitationServiceTest {
 
     assertThatThrownBy(() -> invitationService.inviteUser(inviterJwt, "tenant_acme", request))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Either username or username must be provided");
+        .hasMessageContaining("Either username or email must be provided");
   }
 
   @Test
@@ -83,7 +85,7 @@ class WorkspaceInvitationServiceTest {
         new WorkspaceInvitationRequest(null, "jane_doe", WorkspaceRole.ADMIN, null);
 
     when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
-    when(userRepository.findByUsername("jane_doe")).thenReturn(Optional.of(inviteeUser));
+    when(userRepository.findByUsernameIgnoreCase("jane_doe")).thenReturn(Optional.of(inviteeUser));
     when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-inviter-123", "tenant_acme"))
         .thenReturn(Optional.of(WorkspaceRole.MEMBER));
 
@@ -99,7 +101,7 @@ class WorkspaceInvitationServiceTest {
         new WorkspaceInvitationRequest(null, "jane_doe", WorkspaceRole.MEMBER, null);
 
     when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
-    when(userRepository.findByUsername("jane_doe")).thenReturn(Optional.of(inviteeUser));
+    when(userRepository.findByUsernameIgnoreCase("jane_doe")).thenReturn(Optional.of(inviteeUser));
     when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-invitee-456", "tenant_acme"))
         .thenReturn(Optional.of(WorkspaceRole.MEMBER));
 
@@ -118,7 +120,7 @@ class WorkspaceInvitationServiceTest {
     pendingInv.setStatus(InvitationStatus.PENDING);
 
     when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
-    when(userRepository.findByUsername("jane_doe")).thenReturn(Optional.of(inviteeUser));
+    when(userRepository.findByUsernameIgnoreCase("jane_doe")).thenReturn(Optional.of(inviteeUser));
     when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-invitee-456", "tenant_acme"))
         .thenReturn(Optional.empty());
     when(invitationRepository.findByWorkspaceIdAndUsernameIgnoreCase(workspace.getId(), "jane_doe"))
@@ -136,7 +138,8 @@ class WorkspaceInvitationServiceTest {
         new WorkspaceInvitationRequest("jane@example.com", null, WorkspaceRole.MEMBER, null);
 
     when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
-    when(userRepository.findByEmail("jane@example.com")).thenReturn(Optional.of(inviteeUser));
+    when(userRepository.findByEmailIgnoreCase("jane@example.com"))
+        .thenReturn(Optional.of(inviteeUser));
     when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-invitee-456", "tenant_acme"))
         .thenReturn(Optional.empty());
     when(invitationRepository.findByWorkspaceIdAndUsernameIgnoreCase(workspace.getId(), "jane_doe"))
@@ -159,9 +162,36 @@ class WorkspaceInvitationServiceTest {
   }
 
   @Test
+  @DisplayName("inviteUser should find user case-insensitively by mixed-case username")
+  void inviteUser_Success_CaseInsensitiveUsername() {
+    WorkspaceInvitationRequest request =
+        new WorkspaceInvitationRequest(null, "JaNe_DoE", WorkspaceRole.MEMBER, null);
+
+    when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
+    when(userRepository.findByUsernameIgnoreCase("JaNe_DoE")).thenReturn(Optional.of(inviteeUser));
+    when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-invitee-456", "tenant_acme"))
+        .thenReturn(Optional.empty());
+    when(invitationRepository.findByWorkspaceIdAndUsernameIgnoreCase(workspace.getId(), "jane_doe"))
+        .thenReturn(Optional.empty());
+    when(invitationRepository.save(any(WorkspaceInvitation.class)))
+        .thenAnswer(
+            i -> {
+              WorkspaceInvitation inv = i.getArgument(0);
+              inv.setId(UUID.randomUUID());
+              return inv;
+            });
+
+    WorkspaceInvitationResponse response =
+        invitationService.inviteUser(inviterJwt, "tenant_acme", request);
+
+    assertThat(response).isNotNull();
+    assertThat(response.username()).isEqualTo("jane_doe");
+  }
+
+  @Test
   @DisplayName("getPendingInvitations should return pending invitations for current user")
   void getPendingInvitations_Success() {
-    when(userRepository.findByKeycloakId("kc-inviter-123")).thenReturn(Optional.of(inviteeUser));
+    when(userSyncService.getOrSyncUser(inviterJwt)).thenReturn(inviteeUser);
 
     WorkspaceInvitation inv = new WorkspaceInvitation();
     inv.setId(UUID.randomUUID());
@@ -190,7 +220,7 @@ class WorkspaceInvitationServiceTest {
     inv.setUsername("different_user");
 
     when(invitationRepository.findById(invId)).thenReturn(Optional.of(inv));
-    when(userRepository.findByKeycloakId("kc-inviter-123")).thenReturn(Optional.of(inviteeUser));
+    when(userSyncService.getOrSyncUser(inviterJwt)).thenReturn(inviteeUser);
 
     assertThatThrownBy(() -> invitationService.acceptInvitation(inviterJwt, invId))
         .isInstanceOf(IllegalArgumentException.class)
@@ -209,7 +239,7 @@ class WorkspaceInvitationServiceTest {
     inv.setWorkspace(workspace);
 
     when(invitationRepository.findById(invId)).thenReturn(Optional.of(inv));
-    when(userRepository.findByKeycloakId("kc-inviter-123")).thenReturn(Optional.of(inviteeUser));
+    when(userSyncService.getOrSyncUser(inviterJwt)).thenReturn(inviteeUser);
 
     assertThatThrownBy(() -> invitationService.acceptInvitation(inviterJwt, invId))
         .isInstanceOf(IllegalArgumentException.class)
@@ -231,7 +261,7 @@ class WorkspaceInvitationServiceTest {
     inv.setWorkspace(workspace);
 
     when(invitationRepository.findById(invId)).thenReturn(Optional.of(inv));
-    when(userRepository.findByKeycloakId("kc-inviter-123")).thenReturn(Optional.of(inviteeUser));
+    when(userSyncService.getOrSyncUser(inviterJwt)).thenReturn(inviteeUser);
 
     invitationService.acceptInvitation(inviterJwt, invId);
 
@@ -251,7 +281,7 @@ class WorkspaceInvitationServiceTest {
     inv.setWorkspace(workspace);
 
     when(invitationRepository.findById(invId)).thenReturn(Optional.of(inv));
-    when(userRepository.findByKeycloakId("kc-inviter-123")).thenReturn(Optional.of(inviteeUser));
+    when(userSyncService.getOrSyncUser(inviterJwt)).thenReturn(inviteeUser);
 
     invitationService.declineInvitation(inviterJwt, invId);
 

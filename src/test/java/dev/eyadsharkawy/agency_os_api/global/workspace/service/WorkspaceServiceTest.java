@@ -8,6 +8,7 @@ import static org.mockito.Mockito.*;
 import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.global.user.entity.AppUser;
 import dev.eyadsharkawy.agency_os_api.global.user.repository.AppUserRepository;
+import dev.eyadsharkawy.agency_os_api.global.user.service.UserSyncService;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceMemberResponse;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceMemberUpdateRequest;
 import dev.eyadsharkawy.agency_os_api.global.workspace.dto.WorkspaceRequest;
@@ -43,6 +44,7 @@ class WorkspaceServiceTest {
 
   @Mock private WorkspaceRepository workspaceRepository;
   @Mock private AppUserRepository userRepository;
+  @Mock private UserSyncService userSyncService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserWorkspaceRepository userWorkspaceRepository;
   @Mock private ClientUserRepository clientUserRepository;
@@ -59,16 +61,12 @@ class WorkspaceServiceTest {
   void setUp() {
     jwt = mock(Jwt.class);
     lenient().when(jwt.getSubject()).thenReturn("kc-user-123");
-    lenient().when(jwt.getClaimAsString("preferred_username")).thenReturn("testuser");
-    lenient().when(jwt.getClaimAsString("email")).thenReturn("user@agency.com");
-    lenient().when(jwt.getClaimAsString("given_name")).thenReturn("Test");
-    lenient().when(jwt.getClaimAsString("family_name")).thenReturn("User");
 
     ownerUser = new AppUser();
     ownerUser.setId(UUID.randomUUID());
     ownerUser.setKeycloakId("kc-user-123");
     ownerUser.setUsername("testuser");
-    ownerUser.setEmail("user@agency.com");
+    ownerUser.setEmail("owner@agency.com");
     ownerUser.setUserWorkspaces(new HashSet<>());
 
     memberUser = new AppUser();
@@ -81,7 +79,7 @@ class WorkspaceServiceTest {
     workspace = new Workspace();
     workspace.setId(UUID.randomUUID());
     workspace.setName("Acme Agency");
-    workspace.setTenantId("tenant_acme_agency_123456");
+    workspace.setTenantId("tenant_acme");
     workspace.setContactEmail("user@agency.com");
     workspace.setUserWorkspaces(new HashSet<>());
   }
@@ -91,7 +89,7 @@ class WorkspaceServiceTest {
   void createWorkspace_Success_ExistingUser() {
     WorkspaceRequest request = new WorkspaceRequest("Acme Agency");
 
-    when(userRepository.findByKeycloakId("kc-user-123")).thenReturn(Optional.of(ownerUser));
+    when(userSyncService.getOrSyncUser(jwt)).thenReturn(ownerUser);
     when(workspaceRepository.existsByTenantId(anyString())).thenReturn(false);
     when(workspaceRepository.save(any(Workspace.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
@@ -114,7 +112,7 @@ class WorkspaceServiceTest {
   void createWorkspace_Success_NewUser() {
     WorkspaceRequest request = new WorkspaceRequest("New Agency");
 
-    when(userRepository.findByKeycloakId("kc-user-123")).thenReturn(Optional.empty());
+    when(userSyncService.getOrSyncUser(jwt)).thenReturn(ownerUser);
     when(workspaceRepository.existsByTenantId(anyString())).thenReturn(false);
     when(workspaceRepository.save(any(Workspace.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
