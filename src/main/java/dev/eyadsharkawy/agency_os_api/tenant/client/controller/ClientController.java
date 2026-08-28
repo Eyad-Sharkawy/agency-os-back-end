@@ -1,4 +1,4 @@
-package dev.eyadsharkawy.agency_os_api.tenant.client.contoller;
+package dev.eyadsharkawy.agency_os_api.tenant.client.controller;
 
 import dev.eyadsharkawy.agency_os_api.tenant.client.dto.ClientRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.client.dto.ClientResponse;

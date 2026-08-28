@@ -1,4 +1,4 @@
-package dev.eyadsharkawy.agency_os_api.tenant.client.contoller; // intentionally matching misspelled
+package dev.eyadsharkawy.agency_os_api.tenant.client.controller;
 
 // package if any
 
