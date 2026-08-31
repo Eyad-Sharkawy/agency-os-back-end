@@ -16,19 +16,6 @@ pipeline {
                 anyOf {
                     changeRequest()
                     branch 'main'
-                    changeset 'src/**/*'
-                    changeset 'pom.xml'
-                    changeset 'Dockerfile'
-                    changeset 'docker-compose.yml'
-                    changeset 'Jenkinsfile'
-                    changeset 'checkstyle.xml'
-                    changeset '.dockerignore'
-                    changeset '.mvn/**/*'
-                    changeset 'mvnw'
-                    changeset 'mvnw.cmd'
-                    changeset '.env'
-                    changeset '.env.example'
-                    changeset 'stress-tests/**/*'
                 }
             }
             stages {
@@ -41,24 +28,30 @@ pipeline {
                 }
 
                 stage('Integration Tests') {
+                    environment {
+                        TEST_DB_NAME = "pg-test-${env.BUILD_NUMBER}"
+                        TEST_DB_PORT = "${5430 + (env.BUILD_NUMBER.toInteger() % 50)}"
+                    }
                     steps {
-                        sh 'docker rm -f pg-test || true'
+                        sh "docker rm -f ${TEST_DB_NAME} || true"
 
-                        sh 'docker run --rm --name pg-test -e POSTGRES_DB=agency_os -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=password -p 5433:5432 -d postgres:15-alpine'
+                        sh "docker run --rm --name ${TEST_DB_NAME} -e POSTGRES_DB=agency_os -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=password -p ${TEST_DB_PORT}:5432 -d postgres:15-alpine"
 
-                        sh '''
-                            echo "Waiting for PostgreSQL to be ready..."
-                            until docker exec pg-test pg_isready -U postgres > /dev/null 2>&1; do
+                        sh """
+                            echo "Waiting for PostgreSQL to be ready on port ${TEST_DB_PORT}..."
+                            until docker exec ${TEST_DB_NAME} pg_isready -U postgres > /dev/null 2>&1; do
                                 sleep 1
                             done
                             echo "PostgreSQL is ready!"
-                        '''
+                        """
 
                         script {
                             try {
-                                sh './mvnw verify'
+                                withEnv(["DB_URL=jdbc:postgresql://localhost:${TEST_DB_PORT}/agency_os"]) {
+                                    sh './mvnw verify'
+                                }
                             } finally {
-                                sh 'docker stop pg-test || true'
+                                sh "docker stop ${TEST_DB_NAME} || true"
                             }
                         }
                     }
@@ -67,6 +60,7 @@ pipeline {
                 stage('SonarQube Analysis') {
                     steps {
                         withSonarQubeEnv('SonarQube') {
+                            sh 'rm -rf ~/.sonar/cache || true'
                             sh './mvnw sonar:sonar'
                         }
                         
