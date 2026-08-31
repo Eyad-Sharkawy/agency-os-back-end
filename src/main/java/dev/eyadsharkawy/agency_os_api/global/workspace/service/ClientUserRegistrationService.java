@@ -26,10 +26,22 @@ public class ClientUserRegistrationService {
             .orElseThrow(
                 () -> new ResourceNotFoundException("Client not found with id: " + clientId));
 
-    ClientUser clientUser = new ClientUser();
-    clientUser.setUserId(keycloakId);
+    ClientUser clientUser =
+        clientUserRepository
+            .findById(keycloakId)
+            .orElseGet(
+                () -> {
+                  ClientUser cu = new ClientUser();
+                  cu.setUserId(keycloakId);
+                  return cu;
+                });
     clientUser.setClient(client);
 
     clientUserRepository.save(clientUser);
+  }
+
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void unregisterClientUser(String keycloakId) {
+    clientUserRepository.deleteById(keycloakId);
   }
 }

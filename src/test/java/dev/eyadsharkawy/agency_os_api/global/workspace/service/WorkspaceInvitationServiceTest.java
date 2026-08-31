@@ -95,7 +95,8 @@ class WorkspaceInvitationServiceTest {
   }
 
   @Test
-  @DisplayName("inviteUser should throw IllegalArgumentException if user is already a member")
+  @DisplayName(
+      "inviteUser should throw IllegalArgumentException if user is already a team member and invited as team member")
   void inviteUser_AlreadyMember() {
     WorkspaceInvitationRequest request =
         new WorkspaceInvitationRequest(null, "jane_doe", WorkspaceRole.MEMBER, null);
@@ -107,7 +108,54 @@ class WorkspaceInvitationServiceTest {
 
     assertThatThrownBy(() -> invitationService.inviteUser(inviterJwt, "tenant_acme", request))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("already a member");
+        .hasMessageContaining("already an active team member");
+  }
+
+  @Test
+  @DisplayName(
+      "inviteUser should allow converting existing MEMBER to CLIENT when invited as CLIENT by OWNER")
+  void inviteUser_ExistingMemberInvitedAsClient_Success() {
+    UUID clientId = UUID.randomUUID();
+    WorkspaceInvitationRequest request =
+        new WorkspaceInvitationRequest(null, "jane_doe", WorkspaceRole.CLIENT, clientId);
+
+    when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
+    when(userRepository.findByUsernameIgnoreCase("jane_doe")).thenReturn(Optional.of(inviteeUser));
+    when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-inviter-123", "tenant_acme"))
+        .thenReturn(Optional.of(WorkspaceRole.OWNER));
+    when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-invitee-456", "tenant_acme"))
+        .thenReturn(Optional.of(WorkspaceRole.MEMBER));
+    when(invitationRepository.findByWorkspaceIdAndUsernameIgnoreCase(workspace.getId(), "jane_doe"))
+        .thenReturn(Optional.empty());
+    when(invitationRepository.save(any(WorkspaceInvitation.class)))
+        .thenAnswer(
+            i -> {
+              WorkspaceInvitation inv = i.getArgument(0);
+              inv.setId(UUID.randomUUID());
+              return inv;
+            });
+
+    WorkspaceInvitationResponse response =
+        invitationService.inviteUser(inviterJwt, "tenant_acme", request);
+
+    assertThat(response).isNotNull();
+    assertThat(response.role()).isEqualTo("CLIENT");
+    assertThat(response.clientId()).isEqualTo(clientId);
+  }
+
+  @Test
+  @DisplayName(
+      "inviteUser should throw IllegalArgumentException if CLIENT role invitation is missing clientId")
+  void inviteUser_ClientRoleMissingClientId_ThrowsException() {
+    WorkspaceInvitationRequest request =
+        new WorkspaceInvitationRequest(null, "jane_doe", WorkspaceRole.CLIENT, null);
+
+    when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
+    when(userRepository.findByUsernameIgnoreCase("jane_doe")).thenReturn(Optional.of(inviteeUser));
+
+    assertThatThrownBy(() -> invitationService.inviteUser(inviterJwt, "tenant_acme", request))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Client ID is required for client invitations");
   }
 
   @Test

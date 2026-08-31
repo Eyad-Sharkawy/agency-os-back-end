@@ -127,7 +127,10 @@ public class WorkspaceService {
   public List<WorkspaceMemberResponse> getWorkspaceMembers(String tenantId) {
     Workspace workspace = findWorkspaceByTenantIdOrThrow(tenantId);
 
-    return workspace.getUserWorkspaces().stream().map(WorkspaceMemberResponse::fromEntity).toList();
+    return workspace.getUserWorkspaces().stream()
+        .filter(uw -> uw.getRole() != WorkspaceRole.CLIENT)
+        .map(WorkspaceMemberResponse::fromEntity)
+        .toList();
   }
 
   @Transactional
