@@ -14,6 +14,8 @@ pipeline {
         stage('Build and Test') {
             when {
                 anyOf {
+                    changeRequest()
+                    branch 'main'
                     changeset 'src/**/*'
                     changeset 'pom.xml'
                     changeset 'Dockerfile'
@@ -228,7 +230,7 @@ pipeline {
 
             mail to: 'eyad.m.sharkawy@gmail.com',
                  subject: "FAILED: Job '${env.JOB_NAME}' [Build #${env.BUILD_NUMBER}]",
-                 body: "Your Jenkins pipeline failed. Check the logs at ${env.BUILD_URL}"
+                 body: "Your Jenkins pipeline failed on branch '${env.BRANCH_NAME}'. Check the logs at ${env.BUILD_URL}"
         }
     }
 }
