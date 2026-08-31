@@ -30,7 +30,7 @@ pipeline {
                 stage('Integration Tests') {
                     environment {
                         TEST_DB_NAME = "pg-test-${env.BUILD_NUMBER}"
-                        TEST_DB_PORT = "${15432 + (env.EXECUTOR_NUMBER ? env.EXECUTOR_NUMBER.toInteger() : 0)}"
+                        TEST_DB_PORT = "${15432 + (env.EXECUTOR_NUMBER ? env.EXECUTOR_NUMBER.toInteger() * 100 : 0) + (env.BUILD_NUMBER.toInteger() % 100)}"
                     }
                     steps {
                         sh "docker rm -f ${TEST_DB_NAME} || true"
