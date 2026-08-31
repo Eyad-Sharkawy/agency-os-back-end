@@ -60,6 +60,7 @@ pipeline {
                 stage('SonarQube Analysis') {
                     steps {
                         withSonarQubeEnv('SonarQube') {
+                            sh 'rm -rf ~/.sonar/cache || true'
                             sh './mvnw sonar:sonar'
                         }
                         
