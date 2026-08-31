@@ -144,6 +144,21 @@ class WorkspaceInvitationServiceTest {
   }
 
   @Test
+  @DisplayName(
+      "inviteUser should throw IllegalArgumentException if CLIENT role invitation is missing clientId")
+  void inviteUser_ClientRoleMissingClientId_ThrowsException() {
+    WorkspaceInvitationRequest request =
+        new WorkspaceInvitationRequest(null, "jane_doe", WorkspaceRole.CLIENT, null);
+
+    when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
+    when(userRepository.findByUsernameIgnoreCase("jane_doe")).thenReturn(Optional.of(inviteeUser));
+
+    assertThatThrownBy(() -> invitationService.inviteUser(inviterJwt, "tenant_acme", request))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Client ID is required for client invitations");
+  }
+
+  @Test
   @DisplayName("inviteUser should throw IllegalArgumentException if invitation is already pending")
   void inviteUser_AlreadyPending() {
     WorkspaceInvitationRequest request =

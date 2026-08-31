@@ -42,9 +42,9 @@ public class WorkspaceInvitationService {
                 () -> new ResourceNotFoundException("Workspace not found with Id: " + tenantId));
 
     AppUser invitee = resolveInvitee(request);
+    validateRoleRequirements(request.role(), request.clientId());
     validateInviterPermissions(inviterJwt, tenantId, request.role());
-    validateExistingMembership(
-        invitee.getKeycloakId(), tenantId, request.role(), request.clientId());
+    validateExistingMembership(invitee.getKeycloakId(), tenantId, request.role());
 
     Optional<WorkspaceInvitation> existingInvitation =
         findAndValidatePendingInvitation(workspace.getId(), invitee.getUsername());
@@ -112,8 +112,14 @@ public class WorkspaceInvitationService {
     }
   }
 
+  private void validateRoleRequirements(WorkspaceRole targetRole, UUID clientId) {
+    if (targetRole == WorkspaceRole.CLIENT && clientId == null) {
+      throw new IllegalArgumentException("Client ID is required for client invitations.");
+    }
+  }
+
   private void validateExistingMembership(
-      String keycloakId, String tenantId, WorkspaceRole targetRole, UUID clientId) {
+      String keycloakId, String tenantId, WorkspaceRole targetRole) {
     Optional<WorkspaceRole> existingRoleOpt =
         userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
 
@@ -127,9 +133,6 @@ public class WorkspaceInvitationService {
     }
 
     if (targetRole == WorkspaceRole.CLIENT) {
-      if (clientId == null) {
-        throw new IllegalArgumentException("Client ID is required for client invitations.");
-      }
       return;
     }
 
