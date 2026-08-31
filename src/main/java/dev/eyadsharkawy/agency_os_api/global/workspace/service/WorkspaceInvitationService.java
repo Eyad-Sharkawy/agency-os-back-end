@@ -12,6 +12,7 @@ import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceR
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceInvitationRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -77,20 +78,40 @@ public class WorkspaceInvitationService {
       }
     }
 
-    boolean isMember =
-        userWorkspaceRepository
-            .findRoleByKeycloakIdAndTenantId(invitee.getKeycloakId(), tenantId)
-            .isPresent();
+    Optional<WorkspaceRole> existingRoleOpt =
+        userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(invitee.getKeycloakId(), tenantId);
 
-    if (isMember) throw new IllegalArgumentException("User is already a member of this workspace.");
+    if (existingRoleOpt.isPresent()) {
+      WorkspaceRole existingRole = existingRoleOpt.get();
+      if (existingRole == WorkspaceRole.OWNER) {
+        throw new IllegalArgumentException("The workspace owner cannot be converted or invited.");
+      }
 
-    invitationRepository
-        .findByWorkspaceIdAndUsernameIgnoreCase(workspace.getId(), invitee.getUsername())
-        .filter(inv -> inv.getStatus() == InvitationStatus.PENDING)
-        .ifPresent(
-            inv -> {
-              throw new IllegalArgumentException("An invitation is already pending for this user.");
-            });
+      if (request.role() == WorkspaceRole.CLIENT) {
+        if (request.clientId() == null) {
+          throw new IllegalArgumentException("Client ID is required for client invitations.");
+        }
+        // Inviting as CLIENT by the OWNER allows converting an existing team member to CLIENT
+      } else {
+        // Inviting as internal team member (MEMBER or ADMIN) via general workspace invite
+        if (existingRole == WorkspaceRole.CLIENT) {
+          throw new IllegalArgumentException(
+              "This user is currently registered as an external client user. They cannot be invited as a team member.");
+        } else {
+          throw new IllegalArgumentException(
+              "User is already an active team member of this workspace.");
+        }
+      }
+    }
+
+    Optional<WorkspaceInvitation> existingInvitation =
+        invitationRepository.findByWorkspaceIdAndUsernameIgnoreCase(
+            workspace.getId(), invitee.getUsername());
+
+    if (existingInvitation.isPresent()
+        && existingInvitation.get().getStatus() == InvitationStatus.PENDING) {
+      throw new IllegalArgumentException("An invitation is already pending for this user.");
+    }
 
     String inviterUsername = inviterJwt.getClaimAsString("preferred_username");
 
@@ -98,7 +119,7 @@ public class WorkspaceInvitationService {
       inviterUsername = "Anonymous Admin";
     }
 
-    WorkspaceInvitation invitation = new WorkspaceInvitation();
+    WorkspaceInvitation invitation = existingInvitation.orElseGet(WorkspaceInvitation::new);
     invitation.setWorkspace(workspace);
     invitation.setUsername(invitee.getUsername());
     invitation.setInvitedByUsername(inviterUsername);
@@ -140,9 +161,18 @@ public class WorkspaceInvitationService {
     if (!user.getUsername().equalsIgnoreCase(invitation.getUsername()))
       throw new IllegalArgumentException("You are not authorized to accept this invitation.");
 
-    UserWorkspace membership = new UserWorkspace();
-    membership.setUser(user);
-    membership.setWorkspace(invitation.getWorkspace());
+    UserWorkspace membership =
+        userWorkspaceRepository
+            .findById(new UserWorkspaceId(user.getId(), invitation.getWorkspace().getId()))
+            .orElseGet(
+                () -> {
+                  UserWorkspace uw = new UserWorkspace();
+                  uw.setUser(user);
+                  uw.setWorkspace(invitation.getWorkspace());
+                  uw.getId().setUserId(user.getId());
+                  uw.getId().setWorkspaceId(invitation.getWorkspace().getId());
+                  return uw;
+                });
     membership.setRole(invitation.getRole());
 
     if (invitation.getRole() == WorkspaceRole.CLIENT) {
@@ -162,9 +192,6 @@ public class WorkspaceInvitationService {
     invitation.setStatus(InvitationStatus.ACCEPTED);
     invitationRepository.save(invitation);
 
-    // Manually set ID values in the composite key and save directly to prevent cascading issues
-    membership.getId().setUserId(user.getId());
-    membership.getId().setWorkspaceId(invitation.getWorkspace().getId());
     userWorkspaceRepository.save(membership);
 
     log.info(
