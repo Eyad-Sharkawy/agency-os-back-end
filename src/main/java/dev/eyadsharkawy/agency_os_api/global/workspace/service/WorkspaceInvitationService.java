@@ -41,80 +41,15 @@ public class WorkspaceInvitationService {
             .orElseThrow(
                 () -> new ResourceNotFoundException("Workspace not found with Id: " + tenantId));
 
-    AppUser invitee;
-
-    if (request.username() != null && !request.username().isBlank())
-      invitee =
-          userRepository
-              .findByUsernameIgnoreCase(request.username().trim())
-              .orElseThrow(
-                  () ->
-                      new ResourceNotFoundException(
-                          "User not found with username: " + request.username().trim()));
-    else if (request.email() != null && !request.email().isBlank())
-      invitee =
-          userRepository
-              .findByEmailIgnoreCase(request.email().trim())
-              .orElseThrow(
-                  () ->
-                      new ResourceNotFoundException(
-                          "User not found with email: " + request.email().trim()));
-    else
-      throw new IllegalArgumentException(
-          "Either username or email must be provided to invite a user.");
-
-    if (request.role() != WorkspaceRole.MEMBER) {
-      String inviterKeycloakId = inviterJwt.getSubject();
-      WorkspaceRole inviterRole =
-          userWorkspaceRepository
-              .findRoleByKeycloakIdAndTenantId(inviterKeycloakId, tenantId)
-              .orElseThrow(
-                  () ->
-                      new AccessDeniedException(
-                          "Access Denied: Inviter is not a member of this workspace."));
-
-      if (inviterRole != WorkspaceRole.OWNER) {
-        throw new AccessDeniedException("Only workspace OWNER can invite non MEMBER users.");
-      }
-    }
-
-    Optional<WorkspaceRole> existingRoleOpt =
-        userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(invitee.getKeycloakId(), tenantId);
-
-    if (existingRoleOpt.isPresent()) {
-      WorkspaceRole existingRole = existingRoleOpt.get();
-      if (existingRole == WorkspaceRole.OWNER) {
-        throw new IllegalArgumentException("The workspace owner cannot be converted or invited.");
-      }
-
-      if (request.role() == WorkspaceRole.CLIENT) {
-        if (request.clientId() == null) {
-          throw new IllegalArgumentException("Client ID is required for client invitations.");
-        }
-        // Inviting as CLIENT by the OWNER allows converting an existing team member to CLIENT
-      } else {
-        // Inviting as internal team member (MEMBER or ADMIN) via general workspace invite
-        if (existingRole == WorkspaceRole.CLIENT) {
-          throw new IllegalArgumentException(
-              "This user is currently registered as an external client user. They cannot be invited as a team member.");
-        } else {
-          throw new IllegalArgumentException(
-              "User is already an active team member of this workspace.");
-        }
-      }
-    }
+    AppUser invitee = resolveInvitee(request);
+    validateInviterPermissions(inviterJwt, tenantId, request.role());
+    validateExistingMembership(
+        invitee.getKeycloakId(), tenantId, request.role(), request.clientId());
 
     Optional<WorkspaceInvitation> existingInvitation =
-        invitationRepository.findByWorkspaceIdAndUsernameIgnoreCase(
-            workspace.getId(), invitee.getUsername());
-
-    if (existingInvitation.isPresent()
-        && existingInvitation.get().getStatus() == InvitationStatus.PENDING) {
-      throw new IllegalArgumentException("An invitation is already pending for this user.");
-    }
+        findAndValidatePendingInvitation(workspace.getId(), invitee.getUsername());
 
     String inviterUsername = inviterJwt.getClaimAsString("preferred_username");
-
     if (inviterUsername == null) {
       inviterUsername = "Anonymous Admin";
     }
@@ -135,6 +70,86 @@ public class WorkspaceInvitationService {
         inviterUsername);
 
     return WorkspaceInvitationResponse.fromEntity(savedInvitation);
+  }
+
+  private AppUser resolveInvitee(WorkspaceInvitationRequest request) {
+    if (request.username() != null && !request.username().isBlank()) {
+      return userRepository
+          .findByUsernameIgnoreCase(request.username().trim())
+          .orElseThrow(
+              () ->
+                  new ResourceNotFoundException(
+                      "User not found with username: " + request.username().trim()));
+    }
+    if (request.email() != null && !request.email().isBlank()) {
+      return userRepository
+          .findByEmailIgnoreCase(request.email().trim())
+          .orElseThrow(
+              () ->
+                  new ResourceNotFoundException(
+                      "User not found with email: " + request.email().trim()));
+    }
+    throw new IllegalArgumentException(
+        "Either username or email must be provided to invite a user.");
+  }
+
+  private void validateInviterPermissions(
+      Jwt inviterJwt, String tenantId, WorkspaceRole targetRole) {
+    if (targetRole == WorkspaceRole.MEMBER) {
+      return;
+    }
+    String inviterKeycloakId = inviterJwt.getSubject();
+    WorkspaceRole inviterRole =
+        userWorkspaceRepository
+            .findRoleByKeycloakIdAndTenantId(inviterKeycloakId, tenantId)
+            .orElseThrow(
+                () ->
+                    new AccessDeniedException(
+                        "Access Denied: Inviter is not a member of this workspace."));
+
+    if (inviterRole != WorkspaceRole.OWNER) {
+      throw new AccessDeniedException("Only workspace OWNER can invite non MEMBER users.");
+    }
+  }
+
+  private void validateExistingMembership(
+      String keycloakId, String tenantId, WorkspaceRole targetRole, UUID clientId) {
+    Optional<WorkspaceRole> existingRoleOpt =
+        userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+
+    if (existingRoleOpt.isEmpty()) {
+      return;
+    }
+
+    WorkspaceRole existingRole = existingRoleOpt.get();
+    if (existingRole == WorkspaceRole.OWNER) {
+      throw new IllegalArgumentException("The workspace owner cannot be converted or invited.");
+    }
+
+    if (targetRole == WorkspaceRole.CLIENT) {
+      if (clientId == null) {
+        throw new IllegalArgumentException("Client ID is required for client invitations.");
+      }
+      return;
+    }
+
+    if (existingRole == WorkspaceRole.CLIENT) {
+      throw new IllegalArgumentException(
+          "This user is currently registered as an external client user. They cannot be invited as a team member.");
+    }
+    throw new IllegalArgumentException("User is already an active team member of this workspace.");
+  }
+
+  private Optional<WorkspaceInvitation> findAndValidatePendingInvitation(
+      UUID workspaceId, String username) {
+    Optional<WorkspaceInvitation> existingInvitation =
+        invitationRepository.findByWorkspaceIdAndUsernameIgnoreCase(workspaceId, username);
+
+    if (existingInvitation.isPresent()
+        && existingInvitation.get().getStatus() == InvitationStatus.PENDING) {
+      throw new IllegalArgumentException("An invitation is already pending for this user.");
+    }
+    return existingInvitation;
   }
 
   @Transactional(readOnly = true)
@@ -158,8 +173,9 @@ public class WorkspaceInvitationService {
 
     AppUser user = userSyncService.getOrSyncUser(jwt);
 
-    if (!user.getUsername().equalsIgnoreCase(invitation.getUsername()))
+    if (!user.getUsername().equalsIgnoreCase(invitation.getUsername())) {
       throw new IllegalArgumentException("You are not authorized to accept this invitation.");
+    }
 
     UserWorkspace membership =
         userWorkspaceRepository
@@ -176,28 +192,31 @@ public class WorkspaceInvitationService {
     membership.setRole(invitation.getRole());
 
     if (invitation.getRole() == WorkspaceRole.CLIENT) {
-      if (invitation.getClientId() == null)
-        throw new IllegalArgumentException("Client ID is required for client invitation.");
-
-      String tenantId = invitation.getWorkspace().getTenantId();
-      TenantContextHolder.setTenantId(tenantId);
-      try {
-        clientUserRegistrationService.registerClientUser(
-            user.getKeycloakId(), invitation.getClientId());
-      } finally {
-        TenantContextHolder.clear();
-      }
+      registerClientUserAccess(invitation, user.getKeycloakId());
     }
 
     invitation.setStatus(InvitationStatus.ACCEPTED);
     invitationRepository.save(invitation);
-
     userWorkspaceRepository.save(membership);
 
     log.info(
         "User [{}] accepted invitation for workspace [{}]",
         user.getUsername(),
         invitation.getWorkspace().getTenantId());
+  }
+
+  private void registerClientUserAccess(WorkspaceInvitation invitation, String keycloakId) {
+    if (invitation.getClientId() == null) {
+      throw new IllegalArgumentException("Client ID is required for client invitation.");
+    }
+
+    String tenantId = invitation.getWorkspace().getTenantId();
+    TenantContextHolder.setTenantId(tenantId);
+    try {
+      clientUserRegistrationService.registerClientUser(keycloakId, invitation.getClientId());
+    } finally {
+      TenantContextHolder.clear();
+    }
   }
 
   @Transactional
@@ -211,8 +230,9 @@ public class WorkspaceInvitationService {
 
     AppUser user = userSyncService.getOrSyncUser(jwt);
 
-    if (!user.getUsername().equalsIgnoreCase(invitation.getUsername()))
+    if (!user.getUsername().equalsIgnoreCase(invitation.getUsername())) {
       throw new IllegalArgumentException("You are not authorized to accept this invitation");
+    }
 
     invitation.setStatus(InvitationStatus.DECLINED);
     invitationRepository.save(invitation);
