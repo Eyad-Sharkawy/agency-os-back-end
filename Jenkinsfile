@@ -29,8 +29,8 @@ pipeline {
 
                 stage('Integration Tests') {
                     environment {
-                        TEST_DB_NAME = "pg-test-${env.BUILD_NUMBER}"
-                        TEST_DB_PORT = "${5430 + (env.BUILD_NUMBER.toInteger() % 50)}"
+                        TEST_DB_NAME = "pg-test-exec-${env.EXECUTOR_NUMBER ? env.EXECUTOR_NUMBER : 0}-${env.BUILD_NUMBER}"
+                        TEST_DB_PORT = "${15432 + (env.EXECUTOR_NUMBER ? env.EXECUTOR_NUMBER.toInteger() * 100 : 0) + (env.BUILD_NUMBER.toInteger() % 100)}"
                     }
                     steps {
                         sh "docker rm -f ${TEST_DB_NAME} || true"
@@ -60,8 +60,10 @@ pipeline {
                 stage('SonarQube Analysis') {
                     steps {
                         withSonarQubeEnv('SonarQube') {
-                            sh 'rm -rf ~/.sonar/cache || true'
-                            sh './mvnw sonar:sonar'
+                            withEnv(["SONAR_USER_HOME=${env.WORKSPACE}/.sonar"]) {
+                                sh 'rm -rf "${SONAR_USER_HOME}/cache" || true'
+                                sh './mvnw sonar:sonar'
+                            }
                         }
                         
                         timeout(time: 5, unit: 'MINUTES') {
