@@ -12,25 +12,6 @@ pipeline {
 
     stages {
         stage('Build and Test') {
-            when {
-                anyOf {
-                    changeRequest()
-                    branch 'main'
-                    changeset 'src/**/*'
-                    changeset 'pom.xml'
-                    changeset 'Dockerfile'
-                    changeset 'docker-compose.yml'
-                    changeset 'Jenkinsfile'
-                    changeset 'checkstyle.xml'
-                    changeset '.dockerignore'
-                    changeset '.mvn/**/*'
-                    changeset 'mvnw'
-                    changeset 'mvnw.cmd'
-                    changeset '.env'
-                    changeset '.env.example'
-                    changeset 'stress-tests/**/*'
-                }
-            }
             stages {
                 stage('Quality Checks') {
                     steps {
