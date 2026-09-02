@@ -9,7 +9,10 @@ services:
       - .env
     networks:
       - agency-os-net
+      - keycloak-net
 
 networks:
   agency-os-net:
+    external: true
+  keycloak-net:
     external: true
