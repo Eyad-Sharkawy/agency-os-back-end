@@ -244,7 +244,6 @@ class InvoiceServiceTest {
 
     byte[] pdfBytes = invoiceService.generateInvoicePdf(invoiceId);
 
-    assertThat(pdfBytes).isNotNull();
-    assertThat(pdfBytes).hasSizeGreaterThan(0);
+    assertThat(pdfBytes).isNotNull().hasSizeGreaterThan(0);
   }
 }

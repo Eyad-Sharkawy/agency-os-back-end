@@ -20,6 +20,7 @@ import dev.eyadsharkawy.agency_os_api.tenant.task.entity.TaskStatus;
 import dev.eyadsharkawy.agency_os_api.tenant.task.repository.TaskRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.repository.TimeEntryRepository;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -70,7 +71,7 @@ class TaskServiceTest {
     task.setStatus(TaskStatus.IN_PROGRESS);
     task.setPriority(TaskPriority.HIGH);
     task.setProject(project);
-    task.setAssigneeIds(Set.of("kc-user-123"));
+    task.setAssigneeIds(new HashSet<>(Set.of("kc-user-123")));
 
     jwt = mock(Jwt.class);
     lenient().when(jwt.getSubject()).thenReturn("kc-user-123");
@@ -210,5 +211,70 @@ class TaskServiceTest {
     taskService.deleteTaskById(taskId);
 
     verify(taskRepository, times(1)).delete(task);
+  }
+
+  @Test
+  @DisplayName("getTasksByAssigneeId for MEMBER querying self should succeed")
+  void getTasksByAssigneeId_MemberQueryingSelf_Success() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+    when(taskRepository.findByAssigneeId("kc-user-123")).thenReturn(List.of(task));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(60);
+
+    List<TaskResponse> responses = taskService.getTasksByAssigneeId("kc-user-123");
+
+    assertThat(responses).hasSize(1);
+    assertThat(responses.get(0).id()).isEqualTo(taskId);
+  }
+
+  @Test
+  @DisplayName("getTasksByAssigneeId for ADMIN querying other user should succeed")
+  void getTasksByAssigneeId_AdminQueryingOther_Success() {
+    mockSecurityContext(WorkspaceRole.ADMIN);
+    when(taskRepository.findByAssigneeId("other-user-999")).thenReturn(List.of(task));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(60);
+
+    List<TaskResponse> responses = taskService.getTasksByAssigneeId("other-user-999");
+
+    assertThat(responses).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("updateTaskStatus should throw AccessDeniedException when member not assigned")
+  void updateTaskStatus_MemberNotAssigned_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+    task.setAssigneeIds(Set.of("someone-else"));
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+
+    TaskStatusUpdateRequest request = new TaskStatusUpdateRequest(TaskStatus.DONE);
+
+    assertThatThrownBy(() -> taskService.updateTaskStatus(taskId, request))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("You are not assigned to this task");
+  }
+
+  @Test
+  @DisplayName("updateTaskById should update and return response")
+  void updateTaskById_Success() {
+    TaskRequest request =
+        new TaskRequest(
+            "New Task Title",
+            "New Desc",
+            Instant.now(),
+            Instant.now(),
+            180,
+            TaskPriority.URGENT,
+            TaskStatus.IN_PROGRESS,
+            projectId,
+            Set.of("kc-user-123"));
+
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(taskRepository.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(120);
+
+    TaskResponse response = taskService.updateTaskById(taskId, request);
+
+    assertThat(response).isNotNull();
+    assertThat(response.title()).isEqualTo("New Task Title");
   }
 }

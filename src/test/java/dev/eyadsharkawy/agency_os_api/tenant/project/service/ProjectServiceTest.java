@@ -260,4 +260,150 @@ class ProjectServiceTest {
 
     verify(projectRepository, times(1)).delete(project);
   }
+
+  @Test
+  @DisplayName("getProjectById should return ProjectResponse for OWNER")
+  void getProjectById_Owner_Success() {
+    mockSecurityContext(WorkspaceRole.OWNER);
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+    ProjectResponse response = projectService.getProjectById(projectId);
+
+    assertThat(response).isNotNull();
+    assertThat(response.id()).isEqualTo(projectId);
+  }
+
+  @Test
+  @DisplayName("getProjectById for MEMBER assigned to project should succeed")
+  void getProjectById_MemberAssigned_Success() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(projectRepository.isUserAssignedToProject(projectId, "kc-user-123")).thenReturn(true);
+
+    ProjectResponse response = projectService.getProjectById(projectId);
+
+    assertThat(response).isNotNull();
+    assertThat(response.id()).isEqualTo(projectId);
+  }
+
+  @Test
+  @DisplayName(
+      "getProjectById for CLIENT should throw AccessDeniedException when client user is empty")
+  void getProjectById_ClientUserEmpty_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> projectService.getProjectById(projectId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("You are not authorized to view this project");
+  }
+
+  @Test
+  @DisplayName("getProjectById should throw ResourceNotFoundException when project not found")
+  void getProjectById_NotFound_ThrowsException() {
+    when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> projectService.getProjectById(projectId))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessageContaining("Project not found with id: " + projectId);
+  }
+
+  @Test
+  @DisplayName(
+      "updateProjectById should throw AccessDeniedException when non-OWNER tries to change client")
+  void updateProjectById_NonOwnerChangesClient_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.ADMIN);
+    UUID otherClientId = UUID.randomUUID();
+    ProjectRequest request =
+        new ProjectRequest(
+            "New Title",
+            "Updated Description",
+            new BigDecimal("20000"),
+            ProjectStatus.IN_PROGRESS,
+            otherClientId,
+            new BigDecimal("200"));
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+    assertThatThrownBy(() -> projectService.updateProjectById(projectId, request))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Only the workspace OWNER can change a project's client");
+  }
+
+  @Test
+  @DisplayName("updateProjectById should change client when valid for OWNER")
+  void updateProjectById_ChangeClient_Success() {
+    mockSecurityContext(WorkspaceRole.OWNER);
+    UUID newClientId = UUID.randomUUID();
+    Client newClient = new Client();
+    newClient.setId(newClientId);
+
+    ProjectRequest request =
+        new ProjectRequest(
+            "New Title",
+            "Updated Description",
+            new BigDecimal("20000"),
+            ProjectStatus.IN_PROGRESS,
+            newClientId,
+            new BigDecimal("200"));
+
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(clientRepository.findById(newClientId)).thenReturn(Optional.of(newClient));
+    when(projectRepository.save(any(Project.class))).thenAnswer(i -> i.getArgument(0));
+
+    ProjectResponse response = projectService.updateProjectById(projectId, request);
+
+    assertThat(response).isNotNull();
+    assertThat(project.getClient()).isEqualTo(newClient);
+  }
+
+  @Test
+  @DisplayName("updateProjectById should throw ResourceNotFoundException when new client not found")
+  void updateProjectById_NewClientNotFound_ThrowsException() {
+    mockSecurityContext(WorkspaceRole.OWNER);
+    UUID newClientId = UUID.randomUUID();
+    ProjectRequest request =
+        new ProjectRequest(
+            "New Title",
+            "Updated Description",
+            new BigDecimal("20000"),
+            ProjectStatus.IN_PROGRESS,
+            newClientId,
+            new BigDecimal("200"));
+
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(clientRepository.findById(newClientId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> projectService.updateProjectById(projectId, request))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessageContaining("Client not found with id: " + newClientId);
+  }
+
+  @Test
+  @DisplayName("updateProjectById should throw ResourceNotFoundException when project not found")
+  void updateProjectById_NotFound_ThrowsException() {
+    ProjectRequest request =
+        new ProjectRequest(
+            "New Title",
+            "Updated Description",
+            new BigDecimal("20000"),
+            ProjectStatus.IN_PROGRESS,
+            clientId,
+            new BigDecimal("200"));
+    when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> projectService.updateProjectById(projectId, request))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessageContaining("Project not found with id: " + projectId);
+  }
+
+  @Test
+  @DisplayName("deleteProjectById should throw ResourceNotFoundException when project not found")
+  void deleteProjectById_NotFound_ThrowsException() {
+    when(projectRepository.findById(projectId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> projectService.deleteProjectById(projectId))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessageContaining("Project not found with id: " + projectId);
+  }
 }
