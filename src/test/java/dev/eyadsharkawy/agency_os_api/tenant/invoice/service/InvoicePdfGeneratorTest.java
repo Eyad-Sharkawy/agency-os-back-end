@@ -67,7 +67,7 @@ class InvoicePdfGeneratorTest {
         InvoicePdfGenerator.generate(invoice, "Acme Agency", "contact@acme.com", List.of(entry));
 
     assertThat(pdf).isNotNull();
-    assertThat(pdf.length).isGreaterThan(0);
+    assertThat(pdf).hasSizeGreaterThan(0);
   }
 
   @Test
@@ -98,7 +98,7 @@ class InvoicePdfGeneratorTest {
             invoice, "Acme Agency", "contact@acme.com", List.of(entry1, entry2));
 
     assertThat(pdf).isNotNull();
-    assertThat(pdf.length).isGreaterThan(0);
+    assertThat(pdf).hasSizeGreaterThan(0);
   }
 
   @Test
@@ -108,7 +108,7 @@ class InvoicePdfGeneratorTest {
         InvoicePdfGenerator.generate(invoice, "Acme Agency", "contact@acme.com", List.of());
 
     assertThat(pdf).isNotNull();
-    assertThat(pdf.length).isGreaterThan(0);
+    assertThat(pdf).hasSizeGreaterThan(0);
   }
 
   @Test
@@ -131,6 +131,6 @@ class InvoicePdfGeneratorTest {
     byte[] pdf = InvoicePdfGenerator.generate(invoice, "Acme Agency", "contact@acme.com", entries);
 
     assertThat(pdf).isNotNull();
-    assertThat(pdf.length).isGreaterThan(0);
+    assertThat(pdf).hasSizeGreaterThan(0);
   }
 }

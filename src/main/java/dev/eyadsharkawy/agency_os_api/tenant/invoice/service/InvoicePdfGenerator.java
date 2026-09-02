@@ -19,6 +19,10 @@ import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 
 public class InvoicePdfGenerator {
 
+  private InvoicePdfGenerator() {
+    // Utility class
+  }
+
   private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 

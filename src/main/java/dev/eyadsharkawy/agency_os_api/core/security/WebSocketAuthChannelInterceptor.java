@@ -6,6 +6,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -29,6 +30,7 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
   private final WorkspaceRepository workspaceRepository;
 
   @Override
+  @Nullable
   public Message<?> preSend(Message<?> message, MessageChannel channel) {
     StompHeaderAccessor accessor =
         MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);

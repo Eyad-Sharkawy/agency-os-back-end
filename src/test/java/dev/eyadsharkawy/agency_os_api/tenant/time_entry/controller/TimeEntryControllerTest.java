@@ -32,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(TimeEntryController.class)
 @Import(JacksonConfig.class)
-public class TimeEntryControllerTest {
+class TimeEntryControllerTest {
 
   @Autowired private MockMvc mockMvc;
 

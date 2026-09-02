@@ -32,7 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(TaskController.class)
 @Import(JacksonConfig.class)
-public class TaskControllerTest {
+class TaskControllerTest {
 
   @Autowired private MockMvc mockMvc;
 

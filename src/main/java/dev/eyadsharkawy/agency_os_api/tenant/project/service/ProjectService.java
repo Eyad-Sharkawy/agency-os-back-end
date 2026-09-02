@@ -26,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProjectService {
 
+  private static final String PROJECT_NOT_FOUND_PREFIX = "Project not found with id: ";
+
   private final ProjectRepository projectRepository;
   private final ClientRepository clientRepository;
   private final ClientUserRepository clientUserRepository;
@@ -113,9 +115,14 @@ public class ProjectService {
     Project project =
         projectRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException(PROJECT_NOT_FOUND_PREFIX + id));
 
-    // Client & Member scope validation
+    validateProjectAccess(project, id);
+
+    return ProjectResponse.fromEntity(project);
+  }
+
+  private void validateProjectAccess(Project project, UUID id) {
     var authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
       String keycloakId = jwt.getSubject();
@@ -125,22 +132,23 @@ public class ProjectService {
       if (roleOpt.isPresent()) {
         WorkspaceRole role = roleOpt.get();
         if (role == WorkspaceRole.CLIENT) {
-          var clientUserOpt = clientUserRepository.findById(keycloakId);
-          if (clientUserOpt.isEmpty()
-              || !clientUserOpt.get().getClient().getId().equals(project.getClient().getId())) {
-            throw new AccessDeniedException(
-                "Access Denied: You are not authorized to view this project.");
-          }
-        } else if (role == WorkspaceRole.MEMBER) {
-          if (!projectRepository.isUserAssignedToProject(id, keycloakId)) {
-            throw new AccessDeniedException(
-                "Access Denied: You are not assigned to any tasks in this project.");
-          }
+          validateClientProjectAccess(project, keycloakId);
+        } else if (role == WorkspaceRole.MEMBER
+            && !projectRepository.isUserAssignedToProject(id, keycloakId)) {
+          throw new AccessDeniedException(
+              "Access Denied: You are not assigned to any tasks in this project.");
         }
       }
     }
+  }
 
-    return ProjectResponse.fromEntity(project);
+  private void validateClientProjectAccess(Project project, String keycloakId) {
+    var clientUserOpt = clientUserRepository.findById(keycloakId);
+    if (clientUserOpt.isEmpty()
+        || !clientUserOpt.get().getClient().getId().equals(project.getClient().getId())) {
+      throw new AccessDeniedException(
+          "Access Denied: You are not authorized to view this project.");
+    }
   }
 
   @Transactional(readOnly = true)
@@ -162,7 +170,7 @@ public class ProjectService {
     Project project =
         projectRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException(PROJECT_NOT_FOUND_PREFIX + id));
 
     var authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
@@ -174,11 +182,10 @@ public class ProjectService {
               .orElseThrow(
                   () -> new AccessDeniedException("Access Denied: Requester is not a member."));
 
-      if (role != WorkspaceRole.OWNER) {
-        if (request.clientId() != null && !request.clientId().equals(project.getClient().getId())) {
-          throw new AccessDeniedException(
-              "Only the workspace OWNER can change a project's client.");
-        }
+      if (role != WorkspaceRole.OWNER
+          && request.clientId() != null
+          && !request.clientId().equals(project.getClient().getId())) {
+        throw new AccessDeniedException("Only the workspace OWNER can change a project's client.");
       }
     }
 
@@ -210,7 +217,7 @@ public class ProjectService {
     Project project =
         projectRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Project not found with id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException(PROJECT_NOT_FOUND_PREFIX + id));
 
     projectRepository.delete(project);
   }

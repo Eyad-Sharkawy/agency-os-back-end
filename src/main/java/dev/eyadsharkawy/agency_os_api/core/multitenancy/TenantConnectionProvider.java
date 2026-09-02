@@ -17,9 +17,9 @@ import org.springframework.stereotype.Component;
 public class TenantConnectionProvider implements MultiTenantConnectionProvider<String> {
 
   private static final String DEFAULT_SCHEMA = "public";
-  private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
+  private static final Pattern SAFE_IDENTIFIER = Pattern.compile("^[a-zA-Z_]\\w*$");
 
-  private final DataSource dataSource;
+  private final transient DataSource dataSource;
 
   @Override
   public Connection getAnyConnection() throws SQLException {

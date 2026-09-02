@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(InvoiceController.class)
 @Import(JacksonConfig.class)
-public class InvoiceControllerTest {
+class InvoiceControllerTest {
 
   @Autowired private MockMvc mockMvc;
 

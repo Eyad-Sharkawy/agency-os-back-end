@@ -31,7 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(WorkspaceController.class)
 @Import(JacksonConfig.class)
-public class WorkspaceControllerTest {
+class WorkspaceControllerTest {
 
   @Autowired private MockMvc mockMvc;
 

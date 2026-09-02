@@ -35,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class WorkspaceService {
 
+  private static final String WORKSPACE_NOT_FOUND_PREFIX = "Workspace not found: ";
+
   private final WorkspaceRepository workspaceRepository;
   private final AppUserRepository userRepository;
   private final UserSyncService userSyncService;
@@ -143,7 +145,8 @@ public class WorkspaceService {
     WorkspaceRole requesterRole =
         userWorkspaceRepository
             .findRoleByKeycloakIdAndTenantId(requesterKeycloakId, tenantId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + tenantId));
+            .orElseThrow(
+                () -> new ResourceNotFoundException(WORKSPACE_NOT_FOUND_PREFIX + tenantId));
 
     UserWorkspace membership =
         findUserWorkspaceByIdOrThrow(new UserWorkspaceId(userId, workspace.getId()));
@@ -155,10 +158,11 @@ public class WorkspaceService {
       throw new IllegalArgumentException(
           "To change the owner, please use the ownership transfer flow.");
 
-    if (request.role() == WorkspaceRole.CLIENT || membership.getRole() == WorkspaceRole.CLIENT)
-      if (requesterRole != WorkspaceRole.OWNER)
-        throw new AccessDeniedException(
-            "Only the workspace OWNER can modify CLIENT role associations.");
+    if ((request.role() == WorkspaceRole.CLIENT || membership.getRole() == WorkspaceRole.CLIENT)
+        && requesterRole != WorkspaceRole.OWNER) {
+      throw new AccessDeniedException(
+          "Only the workspace OWNER can modify CLIENT role associations.");
+    }
 
     // Check 4: Admins cannot modify other Admins or assign the ADMIN role
     if (requesterRole == WorkspaceRole.ADMIN) {
@@ -209,7 +213,8 @@ public class WorkspaceService {
     Workspace workspace =
         workspaceRepository
             .findByTenantId(tenantId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + tenantId));
+            .orElseThrow(
+                () -> new ResourceNotFoundException(WORKSPACE_NOT_FOUND_PREFIX + tenantId));
     WorkspaceRole requesterRole =
         userWorkspaceRepository
             .findRoleByKeycloakIdAndTenantId(requesterKeycloakId, tenantId)
@@ -248,7 +253,8 @@ public class WorkspaceService {
     Workspace workspace =
         workspaceRepository
             .findByTenantId(tenantId)
-            .orElseThrow(() -> new ResourceNotFoundException("Workspace not found: " + tenantId));
+            .orElseThrow(
+                () -> new ResourceNotFoundException(WORKSPACE_NOT_FOUND_PREFIX + tenantId));
 
     UserWorkspace oldOwnerMembership =
         userWorkspaceRepository

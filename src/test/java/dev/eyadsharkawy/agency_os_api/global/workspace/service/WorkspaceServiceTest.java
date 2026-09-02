@@ -224,11 +224,10 @@ class WorkspaceServiceTest {
 
     WorkspaceMemberUpdateRequest request =
         new WorkspaceMemberUpdateRequest(WorkspaceRole.ADMIN, null);
+    UUID ownerId = ownerUser.getId();
 
     assertThatThrownBy(
-            () ->
-                workspaceService.updateWorkspaceMember(
-                    jwt, "tenant_acme", ownerUser.getId(), request))
+            () -> workspaceService.updateWorkspaceMember(jwt, "tenant_acme", ownerId, request))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("You cannot modify your own role");
   }
@@ -250,11 +249,10 @@ class WorkspaceServiceTest {
 
     WorkspaceMemberUpdateRequest request =
         new WorkspaceMemberUpdateRequest(WorkspaceRole.OWNER, null);
+    UUID memberId = memberUser.getId();
 
     assertThatThrownBy(
-            () ->
-                workspaceService.updateWorkspaceMember(
-                    jwt, "tenant_acme", memberUser.getId(), request))
+            () -> workspaceService.updateWorkspaceMember(jwt, "tenant_acme", memberId, request))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("ownership transfer flow");
   }
@@ -277,11 +275,10 @@ class WorkspaceServiceTest {
 
     WorkspaceMemberUpdateRequest request =
         new WorkspaceMemberUpdateRequest(WorkspaceRole.ADMIN, null);
+    UUID memberId = memberUser.getId();
 
     assertThatThrownBy(
-            () ->
-                workspaceService.updateWorkspaceMember(
-                    jwt, "tenant_acme", memberUser.getId(), request))
+            () -> workspaceService.updateWorkspaceMember(jwt, "tenant_acme", memberId, request))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessageContaining("Admins cannot promote users");
   }
@@ -331,10 +328,10 @@ class WorkspaceServiceTest {
             new UserWorkspaceId(ownerUser.getId(), workspace.getId())))
         .thenReturn(Optional.of(uwOwner));
 
+    UUID ownerId = ownerUser.getId();
+
     assertThatThrownBy(
-            () ->
-                workspaceService.removeWorkspaceMember(
-                    "kc-user-123", "tenant_acme", ownerUser.getId()))
+            () -> workspaceService.removeWorkspaceMember("kc-user-123", "tenant_acme", ownerId))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("cannot remove yourself");
   }
