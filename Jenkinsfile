@@ -8,6 +8,7 @@ pipeline {
         DB_USERNAME = 'postgres'
         DB_PASSWORD = 'password'
         KEYCLOAK_ISSUER_URI = 'https://key-cloak.duckdns.org/realms/agency-os-realm'
+        KEYCLOAK_SET_URI = 'https://key-cloak.duckdns.org/realms/agency-os-realm/protocol/openid-connect/certs'
     }
 
     stages {
