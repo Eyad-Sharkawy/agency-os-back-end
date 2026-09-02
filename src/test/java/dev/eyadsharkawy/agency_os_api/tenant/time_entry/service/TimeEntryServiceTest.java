@@ -92,6 +92,26 @@ class TimeEntryServiceTest {
   }
 
   @Test
+  @DisplayName("logTimeManually with blank userId should default to caller")
+  void logTimeManually_BlankUserId_DefaultsToCaller() {
+    TimeEntryRequest request = new TimeEntryRequest(taskId, 60, true, "   ");
+
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+    when(timeEntryRepository.save(any(TimeEntry.class)))
+        .thenAnswer(
+            i -> {
+              TimeEntry te = i.getArgument(0);
+              te.setId(UUID.randomUUID());
+              return te;
+            });
+
+    TimeEntryResponse response = timeEntryService.logTimeManually(jwt, request);
+
+    assertThat(response).isNotNull();
+    assertThat(response.durationMinutes()).isEqualTo(60);
+  }
+
+  @Test
   @DisplayName("logTimeManually on behalf of other user by OWNER or ADMIN should succeed")
   void logTimeManually_OnBehalf_OwnerAdmin_Success() {
     TimeEntryRequest request = new TimeEntryRequest(taskId, 90, true, "kc-target-456");
@@ -239,5 +259,17 @@ class TimeEntryServiceTest {
 
     assertThatThrownBy(() -> timeEntryService.deleteTimeEntry(entryId))
         .isInstanceOf(ResourceNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("getActiveTimer should return empty when jwt subject is null")
+  void getActiveTimer_NullSubject_ReturnsEmpty() {
+    Jwt nullJwt = mock(Jwt.class);
+    when(nullJwt.getSubject()).thenReturn(null);
+
+    Optional<ActiveTimerResponse> timerOpt = timeEntryService.getActiveTimer(nullJwt);
+
+    assertThat(timerOpt).isEmpty();
+    verifyNoInteractions(activeTimerRepository);
   }
 }

@@ -117,12 +117,11 @@ public class TaskService {
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.MEMBER) {
-        // A member can only query their own task assignments, not others
-        if (!keycloakId.equals(assigneeId)) {
-          throw new AccessDeniedException(
-              "Access Denied: You cannot view task assignments of other team members.");
-        }
+      if (roleOpt.isPresent()
+          && roleOpt.get() == WorkspaceRole.MEMBER
+          && !keycloakId.equals(assigneeId)) {
+        throw new AccessDeniedException(
+            "Access Denied: You cannot view task assignments of other team members.");
       }
     }
 
@@ -170,10 +169,10 @@ public class TaskService {
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.MEMBER) {
-        if (!task.getAssigneeIds().contains(keycloakId)) {
-          throw new AccessDeniedException("Access Denied: You are not assigned to this task.");
-        }
+      if (roleOpt.isPresent()
+          && roleOpt.get() == WorkspaceRole.MEMBER
+          && !task.getAssigneeIds().contains(keycloakId)) {
+        throw new AccessDeniedException("Access Denied: You are not assigned to this task.");
       }
     }
   }

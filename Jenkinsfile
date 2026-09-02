@@ -111,25 +111,51 @@ pipeline {
                             echo "Starting staging backend container..."
                             docker run -d --name agency-os-staging \
                               --network agency-os-net \
+                              -e DB_URL="jdbc:postgresql://pg-perf-test:5432/agency_os" \
+                              -e DB_USERNAME="postgres" \
+                              -e DB_PASSWORD="password" \
                               -e SPRING_DATASOURCE_URL="jdbc:postgresql://pg-perf-test:5432/agency_os" \
                               -e SPRING_DATASOURCE_USERNAME="postgres" \
                               -e SPRING_DATASOURCE_PASSWORD="password" \
                               -e KEYCLOAK_ISSUER_URI="${KEYCLOAK_ISSUER_URI}" \
+                              -e KEYCLOAK_SET_URI="${KEYCLOAK_SET_URI}" \
                               agency-os-staging:latest
 
                             # 5. Wait for the staging backend container to be fully initialized and healthy
                             echo "Waiting for staging backend container to start..."
-                            docker run --rm \
-                              --network agency-os-net \
-                              curlimages/curl -s --retry 15 --retry-delay 2 --retry-connrefused http://agency-os-staging:8080/api/v1/workspaces > /dev/null || true
+                            BACKEND_READY=false
+                            for attempt in $(seq 1 30); do
+                                if docker run --rm --network agency-os-net curlimages/curl -s -f http://agency-os-staging:8080/api-docs > /dev/null 2>&1; then
+                                    echo "Staging backend is ready!"
+                                    BACKEND_READY=true
+                                    break
+                                fi
+                                if ! docker ps -q -f name=agency-os-staging | grep -q .; then
+                                    echo "Error: agency-os-staging container exited unexpectedly!"
+                                    docker logs agency-os-staging
+                                    exit 1
+                                fi
+                                sleep 2
+                            done
+
+                            if [ "$BACKEND_READY" = false ]; then
+                                echo "Error: Timed out waiting for staging backend container to start."
+                                docker logs agency-os-staging
+                                exit 1
+                            fi
                             echo "Staging backend is ready! Starting stress tests..."
 
-                            # 6. Fetch JWT tokens programmatically from Keycloak for all 5 users
+                            # 6. Fetch JWT tokens programmatically from Keycloak for all 5 users securely
                             echo "Fetching tokens for test users..."
+                            set +x
+                            TOKENS_ENV_FILE="$(pwd)/.k6-tokens.env"
+                            touch "$TOKENS_ENV_FILE"
+                            chmod 600 "$TOKENS_ENV_FILE"
+
                             JWT_TOKENS=""
-                             for i in "1" "2" "3" "4" "5"; do
-                                 USERNAME="${TEST_USER_CREDS_USR}_${i}"
-                                TOKEN_RES=$(curl -s -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
+                            for i in "1" "2" "3" "4" "5"; do
+                                USERNAME="${TEST_USER_CREDS_USR}_${i}"
+                                TOKEN_RES=$(curl -s -S -X POST "${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/token" \
                                   -H "Content-Type: application/x-www-form-urlencoded" \
                                   -d "grant_type=password" \
                                   -d "client_id=${KEYCLOAK_CLIENT_ID}" \
@@ -137,7 +163,7 @@ pipeline {
                                   -d "username=${USERNAME}" \
                                   -d "password=${TEST_USER_CREDS_PSW}")
                                 
-                                SINGLE_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+                                SINGLE_TOKEN=$(echo "$TOKEN_RES" | grep -o '"access_token":"[^"]*' | cut -d'"' -f4)
                                 if [ -n "$SINGLE_TOKEN" ]; then
                                     if [ -z "$JWT_TOKENS" ]; then
                                         JWT_TOKENS="$SINGLE_TOKEN"
@@ -149,14 +175,16 @@ pipeline {
                                     exit 1
                                 fi
                             done
-                            echo "Retrieved tokens successfully."
- 
+                            echo "JWT_TOKENS=${JWT_TOKENS}" > "$TOKENS_ENV_FILE"
+                            echo "Retrieved tokens successfully for 5 test users (sensitive tokens masked)."
+                            set -x
+
                             # 7. Run k6 database seeder (will dynamically create workspaces and seed data!)
                             echo "Seeding the empty staging database..."
                             docker run --rm \
                               --network agency-os-net \
+                              --env-file "$TOKENS_ENV_FILE" \
                               -e API_URL="http://agency-os-staging:8080" \
-                              -e JWT_TOKENS="$JWT_TOKENS" \
                               -e TENANT_IDS="" \
                               -e TENANT_ID="" \
                               -v "$(pwd)/stress-tests:/stress-tests" \
@@ -166,8 +194,8 @@ pipeline {
                             echo "Running project read stress test..."
                             docker run --rm \
                               --network agency-os-net \
+                              --env-file "$TOKENS_ENV_FILE" \
                               -e API_URL="http://agency-os-staging:8080" \
-                              -e JWT_TOKENS="$JWT_TOKENS" \
                               -e TENANT_IDS="" \
                               -e TENANT_ID="" \
                               -v "$(pwd)/stress-tests:/stress-tests" \
@@ -177,8 +205,8 @@ pipeline {
                             echo "Running E2E workflow stress test..."
                             docker run --rm \
                               --network agency-os-net \
+                              --env-file "$TOKENS_ENV_FILE" \
                               -e API_URL="http://agency-os-staging:8080" \
-                              -e JWT_TOKENS="$JWT_TOKENS" \
                               -e TENANT_IDS="" \
                               -e TENANT_ID="" \
                               -v "$(pwd)/stress-tests:/stress-tests" \
@@ -190,7 +218,8 @@ pipeline {
                             sh '''
                                 echo "Staging backend logs:"
                                 docker logs agency-os-staging || true
-                                echo "Cleaning up staging containers..."
+                                echo "Cleaning up staging containers and token env files..."
+                                rm -f .k6-tokens.env || true
                                 docker rm -f agency-os-staging pg-perf-test || true
                             '''
                         }

@@ -146,51 +146,59 @@ public class OpenApiConfig {
   @Bean
   public OpenApiCustomizer sortPathsAndSchemasCustomizer() {
     return openApi -> {
-      // Sort Paths
-      Paths paths = openApi.getPaths();
-      if (paths != null) {
-        Paths sortedPaths = new Paths();
-        paths.entrySet().stream()
-            .sorted(
-                (entry1, entry2) -> {
-                  String p1 = entry1.getKey();
-                  String p2 = entry2.getKey();
-
-                  String[] s1 = p1.split("/");
-                  String[] s2 = p2.split("/");
-
-                  int minLen = Math.min(s1.length, s2.length);
-                  for (int i = 0; i < minLen; i++) {
-                    boolean isParam1 = s1[i].startsWith("{");
-                    boolean isParam2 = s2[i].startsWith("{");
-
-                    if (isParam1 != isParam2) {
-                      return isParam1 ? 1 : -1;
-                    }
-
-                    int comp = s1[i].compareTo(s2[i]);
-                    if (comp != 0) {
-                      return comp;
-                    }
-                  }
-                  return Integer.compare(s1.length, s2.length);
-                })
-            .forEach(entry -> sortedPaths.put(entry.getKey(), entry.getValue()));
-        openApi.setPaths(sortedPaths);
-      }
-
-      // Sort Schemas (DTO Models)
-      if (openApi.getComponents() != null && openApi.getComponents().getSchemas() != null) {
-        Map<String, io.swagger.v3.oas.models.media.Schema> schemas =
-            openApi.getComponents().getSchemas();
-        Map<String, io.swagger.v3.oas.models.media.Schema> sortedSchemas = new LinkedHashMap<>();
-
-        schemas.entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-            .forEach(entry -> sortedSchemas.put(entry.getKey(), entry.getValue()));
-
-        openApi.getComponents().setSchemas(sortedSchemas);
-      }
+      sortPaths(openApi);
+      sortSchemas(openApi);
     };
+  }
+
+  private void sortPaths(OpenAPI openApi) {
+    Paths paths = openApi.getPaths();
+    if (paths == null) {
+      return;
+    }
+    Paths sortedPaths = new Paths();
+    paths.entrySet().stream()
+        .sorted((entry1, entry2) -> comparePaths(entry1.getKey(), entry2.getKey()))
+        .forEach(entry -> sortedPaths.put(entry.getKey(), entry.getValue()));
+    openApi.setPaths(sortedPaths);
+  }
+
+  private int comparePaths(String p1, String p2) {
+    String[] s1 = p1.split("/");
+    String[] s2 = p2.split("/");
+
+    int minLen = Math.min(s1.length, s2.length);
+    for (int i = 0; i < minLen; i++) {
+      int comp = comparePathSegments(s1[i], s2[i]);
+      if (comp != 0) {
+        return comp;
+      }
+    }
+    return Integer.compare(s1.length, s2.length);
+  }
+
+  private int comparePathSegments(String segment1, String segment2) {
+    boolean isParam1 = segment1.startsWith("{");
+    boolean isParam2 = segment2.startsWith("{");
+
+    if (isParam1 != isParam2) {
+      return isParam1 ? 1 : -1;
+    }
+    return segment1.compareTo(segment2);
+  }
+
+  private void sortSchemas(OpenAPI openApi) {
+    if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) {
+      return;
+    }
+    Map<String, io.swagger.v3.oas.models.media.Schema> schemas =
+        openApi.getComponents().getSchemas();
+    Map<String, io.swagger.v3.oas.models.media.Schema> sortedSchemas = new LinkedHashMap<>();
+
+    schemas.entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .forEach(entry -> sortedSchemas.put(entry.getKey(), entry.getValue()));
+
+    openApi.getComponents().setSchemas(sortedSchemas);
   }
 }

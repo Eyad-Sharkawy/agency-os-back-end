@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class ClientService {
+  private static final String CLIENT_NOT_FOUND_PREFIX = "Client not found with id: ";
+
   private final ClientRepository clientRepository;
   private final ProjectRepository projectRepository;
 
@@ -47,7 +49,7 @@ public class ClientService {
     Client client =
         clientRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException(CLIENT_NOT_FOUND_PREFIX + id));
 
     return ClientResponse.fromEntity(client);
   }
@@ -59,7 +61,7 @@ public class ClientService {
     Client client =
         clientRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException(CLIENT_NOT_FOUND_PREFIX + id));
 
     client.setName(request.name());
     client.setEmail(request.email());
@@ -76,7 +78,7 @@ public class ClientService {
     Client client =
         clientRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
+            .orElseThrow(() -> new ResourceNotFoundException(CLIENT_NOT_FOUND_PREFIX + id));
 
     projectRepository.findByClientId(client.getId()).forEach(projectRepository::delete);
 

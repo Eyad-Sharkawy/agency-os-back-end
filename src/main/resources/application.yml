@@ -12,9 +12,9 @@ spring:
       enabled: true
 
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agency_os}}
+    username: ${DB_USERNAME:${SPRING_DATASOURCE_USERNAME:postgres}}
+    password: ${DB_PASSWORD:${SPRING_DATASOURCE_PASSWORD:password}}
     driver-class-name: ${DB_DRIVER:org.postgresql.Driver}
     hikari:
       connection-timeout: 10000
@@ -37,7 +37,7 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
-          jwk-set-uri: ${KEYCLOAK_SET_URI}
+          jwk-set-uri: ${KEYCLOAK_SET_URI:${KEYCLOAK_ISSUER_URI}/protocol/openid-connect/certs}
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}

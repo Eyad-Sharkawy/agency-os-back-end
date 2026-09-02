@@ -111,6 +111,9 @@ public class TimeEntryService {
   @Transactional(readOnly = true)
   public Optional<ActiveTimerResponse> getActiveTimer(Jwt jwt) {
     String userId = jwt.getSubject();
+    if (userId == null) {
+      return Optional.empty();
+    }
     return activeTimerRepository.findById(userId).map(ActiveTimerResponse::fromEntity);
   }
 

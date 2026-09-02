@@ -1,6 +1,6 @@
 package dev.eyadsharkawy.agency_os_api.core.multitenancy;
 
-import org.hibernate.cfg.AvailableSettings;
+import org.hibernate.cfg.MultiTenancySettings;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,8 +13,9 @@ public class HibernateMultiTenancyConfig {
       TenantConnectionProvider tenantConnectionProvider, TenantResolver tenantResolver) {
     return hibernateProperties -> {
       hibernateProperties.put(
-          AvailableSettings.MULTI_TENANT_CONNECTION_PROVIDER, tenantConnectionProvider);
-      hibernateProperties.put(AvailableSettings.MULTI_TENANT_IDENTIFIER_RESOLVER, tenantResolver);
+          MultiTenancySettings.MULTI_TENANT_CONNECTION_PROVIDER, tenantConnectionProvider);
+      hibernateProperties.put(
+          MultiTenancySettings.MULTI_TENANT_IDENTIFIER_RESOLVER, tenantResolver);
     };
   }
 }

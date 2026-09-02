@@ -63,4 +63,14 @@ class ClientUserRegistrationServiceTest {
 
     verify(clientUserRepository, never()).save(any(ClientUser.class));
   }
+
+  @Test
+  @DisplayName("unregisterClientUser should delete by keycloakId")
+  void unregisterClientUser_Success() {
+    String keycloakId = "kc-user-123";
+
+    registrationService.unregisterClientUser(keycloakId);
+
+    verify(clientUserRepository, times(1)).deleteById(keycloakId);
+  }
 }
