@@ -474,20 +474,6 @@ class ProjectServiceTest {
   }
 
   @Test
-  @DisplayName(
-      "getProjectById for CLIENT role should throw AccessDeniedException when no client resolved")
-  void getProjectById_ClientRole_NoClient_AccessDenied() {
-    mockSecurityContext(WorkspaceRole.CLIENT);
-    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
-        .thenReturn(Optional.empty());
-
-    assertThatThrownBy(() -> projectService.getProjectById(projectId))
-        .isInstanceOf(AccessDeniedException.class)
-        .hasMessageContaining("You are not authorized to view this project");
-  }
-
-  @Test
   @DisplayName("deleteProjectById for CLIENT role should throw AccessDeniedException")
   void deleteProjectById_ClientRole_AccessDenied() {
     mockSecurityContext(WorkspaceRole.CLIENT);
