@@ -6,6 +6,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
+import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
+import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
+import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
+import dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService;
 import dev.eyadsharkawy.agency_os_api.tenant.client.dto.ClientRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.client.dto.ClientResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
@@ -23,18 +27,22 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 @ExtendWith(MockitoExtension.class)
 class ClientServiceTest {
 
   @Mock private ClientRepository clientRepository;
-
   @Mock private ProjectRepository projectRepository;
+  @Mock private ClientUserRegistrationService clientUserRegistrationService;
+  @Mock private UserWorkspaceRepository userWorkspaceRepository;
 
   @InjectMocks private ClientService clientService;
 
   private Client client;
   private UUID clientId;
+  private Jwt jwt;
 
   @BeforeEach
   void setUp() {
@@ -44,6 +52,30 @@ class ClientServiceTest {
     client.setName("Globex Corp");
     client.setEmail("contact@globex.com");
     client.setStatus(ClientStatus.ACTIVE);
+
+    jwt = mock(Jwt.class);
+    lenient().when(jwt.getSubject()).thenReturn("kc-user-123");
+    TenantContextHolder.setTenantId("tenant_acme");
+  }
+
+  @org.junit.jupiter.api.AfterEach
+  void tearDown() {
+    SecurityContextHolder.clearContext();
+    TenantContextHolder.clear();
+  }
+
+  private void mockSecurityContext(WorkspaceRole role) {
+    org.springframework.security.core.Authentication auth =
+        mock(org.springframework.security.core.Authentication.class);
+    when(auth.getPrincipal()).thenReturn(jwt);
+
+    org.springframework.security.core.context.SecurityContext securityContext =
+        mock(org.springframework.security.core.context.SecurityContext.class);
+    when(securityContext.getAuthentication()).thenReturn(auth);
+    SecurityContextHolder.setContext(securityContext);
+
+    when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(role));
   }
 
   @Test
@@ -74,6 +106,33 @@ class ClientServiceTest {
   }
 
   @Test
+  @DisplayName("getAllClients for CLIENT role should return only own client record")
+  void getAllClients_ClientRole_ReturnsOwnClient() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(clientId));
+    when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
+
+    List<ClientResponse> responses = clientService.getAllClients();
+
+    assertThat(responses).hasSize(1);
+    assertThat(responses.get(0).id()).isEqualTo(clientId);
+    verify(clientRepository, never()).findAll();
+  }
+
+  @Test
+  @DisplayName("getAllClients for CLIENT role should return empty list when no client resolved")
+  void getAllClients_ClientRole_NoClient_ReturnsEmpty() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.empty());
+
+    List<ClientResponse> responses = clientService.getAllClients();
+
+    assertThat(responses).isEmpty();
+  }
+
+  @Test
   @DisplayName("getClientById should return client response when found")
   void getClientById_Success() {
     when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
@@ -82,6 +141,46 @@ class ClientServiceTest {
 
     assertThat(response).isNotNull();
     assertThat(response.id()).isEqualTo(clientId);
+  }
+
+  @Test
+  @DisplayName("getClientById for CLIENT role should succeed when accessing own client")
+  void getClientById_ClientRole_OwnClient_Success() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(clientId));
+    when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
+
+    ClientResponse response = clientService.getClientById(clientId);
+
+    assertThat(response).isNotNull();
+    assertThat(response.id()).isEqualTo(clientId);
+  }
+
+  @Test
+  @DisplayName("getClientById for CLIENT role should throw AccessDeniedException for other client")
+  void getClientById_ClientRole_OtherClient_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    UUID otherClientId = UUID.randomUUID();
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(otherClientId));
+
+    assertThatThrownBy(() -> clientService.getClientById(clientId))
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+        .hasMessageContaining("You cannot view other clients");
+  }
+
+  @Test
+  @DisplayName(
+      "getClientById for CLIENT role should throw AccessDeniedException when client unresolved")
+  void getClientById_ClientRole_NoClient_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> clientService.getClientById(clientId))
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+        .hasMessageContaining("You cannot view other clients");
   }
 
   @Test

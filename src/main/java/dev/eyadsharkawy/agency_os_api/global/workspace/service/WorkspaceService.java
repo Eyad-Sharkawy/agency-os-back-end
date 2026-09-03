@@ -16,10 +16,6 @@ import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.event.WorkspaceCreatedEvent;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.ClientUser;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -42,8 +38,7 @@ public class WorkspaceService {
   private final UserSyncService userSyncService;
   private final ApplicationEventPublisher eventPublisher;
   private final UserWorkspaceRepository userWorkspaceRepository;
-  private final ClientUserRepository clientUserRepository;
-  private final ClientRepository clientRepository;
+  private final ClientUserRegistrationService clientUserRegistrationService;
 
   @Transactional
   public WorkspaceResponse createWorkspace(Jwt jwt, WorkspaceRequest request) {
@@ -175,30 +170,21 @@ public class WorkspaceService {
     }
 
     if (request.role() == WorkspaceRole.CLIENT) {
-      if (request.clientId() == null)
+      if (request.clientId() == null) {
         throw new IllegalArgumentException("Client ID is required when role is CLIENT.");
+      }
 
       TenantContextHolder.setTenantId(tenantId);
       try {
-        Client client =
-            clientRepository
-                .findById(request.clientId())
-                .orElseThrow(
-                    () ->
-                        new ResourceNotFoundException(
-                            "Client not found with id: " + request.clientId()));
-
-        ClientUser clientUser = new ClientUser();
-        clientUser.setUserId(membership.getUser().getKeycloakId());
-        clientUser.setClient(client);
-        clientUserRepository.save(clientUser);
+        clientUserRegistrationService.registerClientUser(
+            membership.getUser().getKeycloakId(), request.clientId());
       } finally {
         TenantContextHolder.clear();
       }
     } else if (membership.getRole() == WorkspaceRole.CLIENT) {
       TenantContextHolder.setTenantId(tenantId);
       try {
-        clientUserRepository.deleteById(membership.getUser().getKeycloakId());
+        clientUserRegistrationService.unregisterClientUser(membership.getUser().getKeycloakId());
       } finally {
         TenantContextHolder.clear();
       }
@@ -239,7 +225,7 @@ public class WorkspaceService {
     if (membership.getRole() == WorkspaceRole.CLIENT) {
       TenantContextHolder.setTenantId(tenantId);
       try {
-        clientUserRepository.deleteById(membership.getUser().getKeycloakId());
+        clientUserRegistrationService.unregisterClientUser(membership.getUser().getKeycloakId());
       } finally {
         TenantContextHolder.clear();
       }

@@ -21,9 +21,6 @@ import dev.eyadsharkawy.agency_os_api.global.workspace.event.WorkspaceCreatedEve
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.ClientUser;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -47,8 +44,10 @@ class WorkspaceServiceTest {
   @Mock private UserSyncService userSyncService;
   @Mock private ApplicationEventPublisher eventPublisher;
   @Mock private UserWorkspaceRepository userWorkspaceRepository;
-  @Mock private ClientUserRepository clientUserRepository;
-  @Mock private ClientRepository clientRepository;
+
+  @Mock
+  private dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService
+      clientUserRegistrationService;
 
   @InjectMocks private WorkspaceService workspaceService;
 
@@ -301,7 +300,6 @@ class WorkspaceServiceTest {
     when(userWorkspaceRepository.findById(
             new UserWorkspaceId(memberUser.getId(), workspace.getId())))
         .thenReturn(Optional.of(uwMember));
-    when(clientRepository.findById(clientId)).thenReturn(Optional.of(client));
 
     WorkspaceMemberUpdateRequest request =
         new WorkspaceMemberUpdateRequest(WorkspaceRole.CLIENT, clientId);
@@ -309,7 +307,8 @@ class WorkspaceServiceTest {
     workspaceService.updateWorkspaceMember(jwt, "tenant_acme", memberUser.getId(), request);
 
     assertThat(uwMember.getRole()).isEqualTo(WorkspaceRole.CLIENT);
-    verify(clientUserRepository, times(1)).save(any(ClientUser.class));
+    verify(clientUserRegistrationService, times(1))
+        .registerClientUser(memberUser.getKeycloakId(), clientId);
     verify(userWorkspaceRepository, times(1)).save(uwMember);
   }
 
@@ -354,6 +353,77 @@ class WorkspaceServiceTest {
     workspaceService.removeWorkspaceMember("kc-user-123", "tenant_acme", memberUser.getId());
 
     verify(userWorkspaceRepository, times(1)).delete(uwMember);
+  }
+
+  @Test
+  @DisplayName("removeWorkspaceMember should throw AccessDeniedException when Admin removes Client")
+  void removeWorkspaceMember_AdminRemovesClient_ThrowsAccessDeniedException() {
+    UserWorkspace uwClient = new UserWorkspace();
+    uwClient.setUser(memberUser);
+    uwClient.setWorkspace(workspace);
+    uwClient.setRole(WorkspaceRole.CLIENT);
+
+    when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
+    when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(WorkspaceRole.ADMIN));
+    when(userWorkspaceRepository.findById(
+            new UserWorkspaceId(memberUser.getId(), workspace.getId())))
+        .thenReturn(Optional.of(uwClient));
+
+    UUID memberId = memberUser.getId();
+
+    assertThatThrownBy(
+            () -> workspaceService.removeWorkspaceMember("kc-user-123", "tenant_acme", memberId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Only the workspace OWNER can remove CLIENT users");
+  }
+
+  @Test
+  @DisplayName("removeWorkspaceMember should unregister ClientUser when Owner removes Client")
+  void removeWorkspaceMember_OwnerRemovesClient_Success() {
+    UserWorkspace uwClient = new UserWorkspace();
+    uwClient.setUser(memberUser);
+    uwClient.setWorkspace(workspace);
+    uwClient.setRole(WorkspaceRole.CLIENT);
+
+    when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
+    when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(WorkspaceRole.OWNER));
+    when(userWorkspaceRepository.findById(
+            new UserWorkspaceId(memberUser.getId(), workspace.getId())))
+        .thenReturn(Optional.of(uwClient));
+
+    workspaceService.removeWorkspaceMember("kc-user-123", "tenant_acme", memberUser.getId());
+
+    verify(clientUserRegistrationService, times(1))
+        .unregisterClientUser(memberUser.getKeycloakId());
+    verify(userWorkspaceRepository, times(1)).delete(uwClient);
+  }
+
+  @Test
+  @DisplayName("updateWorkspaceMember should unregister ClientUser when demoting from CLIENT")
+  void updateWorkspaceMember_FromClientToMember_Success() {
+    UserWorkspace uwClient = new UserWorkspace();
+    uwClient.setUser(memberUser);
+    uwClient.setWorkspace(workspace);
+    uwClient.setRole(WorkspaceRole.CLIENT);
+
+    when(workspaceRepository.findByTenantId("tenant_acme")).thenReturn(Optional.of(workspace));
+    when(userWorkspaceRepository.findRoleByKeycloakIdAndTenantId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(WorkspaceRole.OWNER));
+    when(userWorkspaceRepository.findById(
+            new UserWorkspaceId(memberUser.getId(), workspace.getId())))
+        .thenReturn(Optional.of(uwClient));
+
+    WorkspaceMemberUpdateRequest request =
+        new WorkspaceMemberUpdateRequest(WorkspaceRole.MEMBER, null);
+
+    workspaceService.updateWorkspaceMember(jwt, "tenant_acme", memberUser.getId(), request);
+
+    assertThat(uwClient.getRole()).isEqualTo(WorkspaceRole.MEMBER);
+    verify(clientUserRegistrationService, times(1))
+        .unregisterClientUser(memberUser.getKeycloakId());
+    verify(userWorkspaceRepository, times(1)).save(uwClient);
   }
 
   @Test

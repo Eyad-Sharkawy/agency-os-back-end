@@ -1,6 +1,10 @@
 package dev.eyadsharkawy.agency_os_api.tenant.client.service;
 
 import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
+import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
+import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
+import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
+import dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService;
 import dev.eyadsharkawy.agency_os_api.tenant.client.dto.ClientRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.client.dto.ClientResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
@@ -10,6 +14,9 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +28,8 @@ public class ClientService {
 
   private final ClientRepository clientRepository;
   private final ProjectRepository projectRepository;
+  private final ClientUserRegistrationService clientUserRegistrationService;
+  private final UserWorkspaceRepository userWorkspaceRepository;
 
   @Transactional
   public ClientResponse createClient(ClientRequest request) {
@@ -40,12 +49,45 @@ public class ClientService {
   public List<ClientResponse> getAllClients() {
     log.info("Fetching all clients for the current tenant");
 
+    var authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+      String keycloakId = jwt.getSubject();
+      String tenantId = TenantContextHolder.getTenantId();
+
+      var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
+        log.info("Client user [{}] queried clients. Restricting to own client record.", keycloakId);
+        var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+        if (clientIdOpt.isPresent()) {
+          return clientRepository.findById(clientIdOpt.get()).stream()
+              .map(ClientResponse::fromEntity)
+              .toList();
+        }
+        return List.of();
+      }
+    }
+
     return clientRepository.findAll().stream().map(ClientResponse::fromEntity).toList();
   }
 
   @Transactional(readOnly = true)
   public ClientResponse getClientById(UUID id) {
     log.info("Fetching client with id: {}", id);
+
+    var authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+      String keycloakId = jwt.getSubject();
+      String tenantId = TenantContextHolder.getTenantId();
+
+      var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
+        var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+        if (clientIdOpt.isEmpty() || !clientIdOpt.get().equals(id)) {
+          throw new AccessDeniedException("Access Denied: You cannot view other clients.");
+        }
+      }
+    }
+
     Client client =
         clientRepository
             .findById(id)

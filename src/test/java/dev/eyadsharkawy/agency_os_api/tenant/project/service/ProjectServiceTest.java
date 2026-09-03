@@ -10,9 +10,7 @@ import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.ClientUser;
 import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.project.dto.ProjectRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.project.dto.ProjectResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.project.entity.Project;
@@ -41,7 +39,11 @@ class ProjectServiceTest {
 
   @Mock private ProjectRepository projectRepository;
   @Mock private ClientRepository clientRepository;
-  @Mock private ClientUserRepository clientUserRepository;
+
+  @Mock
+  private dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService
+      clientUserRegistrationService;
+
   @Mock private UserWorkspaceRepository userWorkspaceRepository;
 
   @InjectMocks private ProjectService projectService;
@@ -148,11 +150,8 @@ class ProjectServiceTest {
   void getAllProjects_ClientRole_Filtered() {
     mockSecurityContext(WorkspaceRole.CLIENT);
 
-    ClientUser clientUser = new ClientUser();
-    clientUser.setUserId("kc-user-123");
-    clientUser.setClient(client);
-
-    when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.of(clientUser));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(clientId));
     when(projectRepository.findByClientId(clientId)).thenReturn(List.of(project));
 
     List<ProjectResponse> responses = projectService.getAllProjects();
@@ -181,13 +180,11 @@ class ProjectServiceTest {
   void getProjectById_ClientMismatch_AccessDenied() {
     mockSecurityContext(WorkspaceRole.CLIENT);
 
-    Client otherClient = new Client();
-    otherClient.setId(UUID.randomUUID());
-    ClientUser clientUser = new ClientUser();
-    clientUser.setClient(otherClient);
+    UUID otherClientId = UUID.randomUUID();
 
     when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-    when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.of(clientUser));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(otherClientId));
 
     assertThatThrownBy(() -> projectService.getProjectById(projectId))
         .isInstanceOf(AccessDeniedException.class)
@@ -292,7 +289,8 @@ class ProjectServiceTest {
   void getProjectById_ClientUserEmpty_AccessDenied() {
     mockSecurityContext(WorkspaceRole.CLIENT);
     when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
-    when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.empty());
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> projectService.getProjectById(projectId))
         .isInstanceOf(AccessDeniedException.class)
@@ -405,5 +403,84 @@ class ProjectServiceTest {
     assertThatThrownBy(() -> projectService.deleteProjectById(projectId))
         .isInstanceOf(ResourceNotFoundException.class)
         .hasMessageContaining("Project not found with id: " + projectId);
+  }
+
+  @Test
+  @DisplayName(
+      "createProject should throw AccessDeniedException when client attempts to create project")
+  void createProject_ClientRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    ProjectRequest request =
+        new ProjectRequest(
+            "Client Project",
+            "Desc",
+            BigDecimal.TEN,
+            ProjectStatus.IN_PROGRESS,
+            clientId,
+            BigDecimal.ONE);
+
+    assertThatThrownBy(() -> projectService.createProject(request))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Clients are not allowed to create projects");
+  }
+
+  @Test
+  @DisplayName(
+      "updateProjectById should throw AccessDeniedException when client attempts to update project")
+  void updateProjectById_ClientRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    ProjectRequest request =
+        new ProjectRequest(
+            "Client Project",
+            "Desc",
+            BigDecimal.TEN,
+            ProjectStatus.IN_PROGRESS,
+            clientId,
+            BigDecimal.ONE);
+
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+    assertThatThrownBy(() -> projectService.updateProjectById(projectId, request))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Clients are not allowed to update projects");
+  }
+
+  @Test
+  @DisplayName("getProjectById for CLIENT role should succeed when project belongs to client")
+  void getProjectById_ClientRole_OwnProject_Success() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(clientId));
+
+    ProjectResponse response = projectService.getProjectById(projectId);
+
+    assertThat(response).isNotNull();
+    assertThat(response.id()).isEqualTo(projectId);
+  }
+
+  @Test
+  @DisplayName(
+      "getProjectById for CLIENT role should throw AccessDeniedException for other project")
+  void getProjectById_ClientRole_OtherProject_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(UUID.randomUUID()));
+
+    assertThatThrownBy(() -> projectService.getProjectById(projectId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("You are not authorized to view this project");
+  }
+
+  @Test
+  @DisplayName("deleteProjectById for CLIENT role should throw AccessDeniedException")
+  void deleteProjectById_ClientRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+
+    assertThatThrownBy(() -> projectService.deleteProjectById(projectId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Clients are not allowed to delete projects");
   }
 }
