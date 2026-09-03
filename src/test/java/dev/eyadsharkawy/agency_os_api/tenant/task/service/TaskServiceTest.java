@@ -9,6 +9,7 @@ import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
+import dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService;
 import dev.eyadsharkawy.agency_os_api.tenant.project.entity.Project;
 import dev.eyadsharkawy.agency_os_api.tenant.project.repository.ProjectRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.task.dto.TaskRequest;
@@ -46,6 +47,7 @@ class TaskServiceTest {
   @Mock private ProjectRepository projectRepository;
   @Mock private TimeEntryRepository timeEntryRepository;
   @Mock private UserWorkspaceRepository userWorkspaceRepository;
+  @Mock private ClientUserRegistrationService clientUserRegistrationService;
 
   @InjectMocks private TaskService taskService;
 
@@ -53,16 +55,23 @@ class TaskServiceTest {
   private Task task;
   private UUID projectId;
   private UUID taskId;
+  private UUID clientId;
   private Jwt jwt;
 
   @BeforeEach
   void setUp() {
     projectId = UUID.randomUUID();
     taskId = UUID.randomUUID();
+    clientId = UUID.randomUUID();
+
+    dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client client =
+        new dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client();
+    client.setId(clientId);
 
     project = new Project();
     project.setId(projectId);
     project.setName("Project Alpha");
+    project.setClient(client);
 
     task = new Task();
     task.setId(taskId);
@@ -276,5 +285,221 @@ class TaskServiceTest {
 
     assertThat(response).isNotNull();
     assertThat(response.title()).isEqualTo("New Task Title");
+  }
+
+  @Test
+  @DisplayName("updateTaskStatus should throw AccessDeniedException when client attempts update")
+  void updateTaskStatus_ClientRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+
+    TaskStatusUpdateRequest request = new TaskStatusUpdateRequest(TaskStatus.DONE);
+
+    assertThatThrownBy(() -> taskService.updateTaskStatus(taskId, request))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Clients are not allowed to update task status or move columns");
+  }
+
+  @Test
+  @DisplayName("createTask should throw AccessDeniedException when client attempts to create task")
+  void createTask_ClientRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    TaskRequest request =
+        new TaskRequest(
+            "Client Task",
+            "Desc",
+            Instant.now(),
+            Instant.now(),
+            120,
+            TaskPriority.MEDIUM,
+            TaskStatus.TODO,
+            projectId,
+            Set.of());
+
+    assertThatThrownBy(() -> taskService.createTask(request))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Clients cannot create tasks");
+  }
+
+  @Test
+  @DisplayName("createTask should throw IllegalArgumentException when client assigned")
+  void createTask_ClientAssignee_ThrowsException() {
+    when(userWorkspaceRepository.hasClientRoleAssignee(any(), eq("tenant_acme"))).thenReturn(true);
+    TaskRequest request =
+        new TaskRequest(
+            "Task",
+            "Desc",
+            Instant.now(),
+            Instant.now(),
+            120,
+            TaskPriority.MEDIUM,
+            TaskStatus.TODO,
+            projectId,
+            Set.of("kc-client-123"));
+
+    assertThatThrownBy(() -> taskService.createTask(request))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Clients cannot be assigned to tasks");
+  }
+
+  @Test
+  @DisplayName("getAllTasks for CLIENT role should return tasks for client projects")
+  void getAllTasks_ClientRole_WithClient_Success() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(clientId));
+    when(taskRepository.findByProjectClientId(clientId)).thenReturn(List.of(task));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(60);
+
+    List<TaskResponse> responses = taskService.getAllTasks();
+
+    assertThat(responses).hasSize(1);
+    assertThat(responses.get(0).id()).isEqualTo(taskId);
+  }
+
+  @Test
+  @DisplayName("getAllTasks for CLIENT role should return empty list when no client resolved")
+  void getAllTasks_ClientRole_NoClient_ReturnsEmpty() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.empty());
+
+    List<TaskResponse> responses = taskService.getAllTasks();
+
+    assertThat(responses).isEmpty();
+  }
+
+  @Test
+  @DisplayName("getTaskById for CLIENT role should succeed when task belongs to client project")
+  void getTaskById_ClientRole_OwnClient_Success() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(clientId));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(60);
+
+    TaskResponse response = taskService.getTaskById(taskId);
+
+    assertThat(response).isNotNull();
+    assertThat(response.id()).isEqualTo(taskId);
+  }
+
+  @Test
+  @DisplayName("getTaskById for CLIENT role should throw AccessDeniedException when other client")
+  void getTaskById_ClientRole_OtherClient_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(UUID.randomUUID()));
+
+    assertThatThrownBy(() -> taskService.getTaskById(taskId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("not authorized to access this task");
+  }
+
+  @Test
+  @DisplayName(
+      "getTaskById for CLIENT role should throw AccessDeniedException when client unresolved")
+  void getTaskById_ClientRole_NoClient_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> taskService.getTaskById(taskId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("not authorized to access this task");
+  }
+
+  @Test
+  @DisplayName("getTasksByProjectId should throw ResourceNotFoundException when project not found")
+  void getTasksByProjectId_ProjectNotFound_ThrowsException() {
+    when(projectRepository.existsById(projectId)).thenReturn(false);
+
+    assertThatThrownBy(() -> taskService.getTasksByProjectId(projectId))
+        .isInstanceOf(ResourceNotFoundException.class)
+        .hasMessageContaining("Project not found with id: " + projectId);
+  }
+
+  @Test
+  @DisplayName("getTasksByProjectId for MEMBER role should filter by assigned tasks")
+  void getTasksByProjectId_MemberRole_FiltersByAssigned() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+    when(projectRepository.existsById(projectId)).thenReturn(true);
+
+    Task unassignedTask = new Task();
+    unassignedTask.setId(UUID.randomUUID());
+    unassignedTask.setAssigneeIds(Set.of("other-user-999"));
+
+    when(taskRepository.findByProjectId(projectId)).thenReturn(List.of(task, unassignedTask));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(30);
+
+    List<TaskResponse> responses = taskService.getTasksByProjectId(projectId);
+
+    assertThat(responses).hasSize(1);
+    assertThat(responses.get(0).id()).isEqualTo(taskId);
+  }
+
+  @Test
+  @DisplayName("getTasksByProjectId for CLIENT role should succeed when project belongs to client")
+  void getTasksByProjectId_ClientRole_OwnProject_Success() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(projectRepository.existsById(projectId)).thenReturn(true);
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(clientId));
+    when(taskRepository.findByProjectId(projectId)).thenReturn(List.of(task));
+    when(timeEntryRepository.sumDurationMinutesByTaskId(taskId)).thenReturn(30);
+
+    List<TaskResponse> responses = taskService.getTasksByProjectId(projectId);
+
+    assertThat(responses).hasSize(1);
+    assertThat(responses.get(0).id()).isEqualTo(taskId);
+  }
+
+  @Test
+  @DisplayName(
+      "getTasksByProjectId for CLIENT role should throw AccessDeniedException for other project")
+  void getTasksByProjectId_ClientRole_OtherProject_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    when(projectRepository.existsById(projectId)).thenReturn(true);
+    when(projectRepository.findById(projectId)).thenReturn(Optional.of(project));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(UUID.randomUUID()));
+
+    assertThatThrownBy(() -> taskService.getTasksByProjectId(projectId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("You cannot view tasks for this project");
+  }
+
+  @Test
+  @DisplayName("updateTaskById for CLIENT role should throw AccessDeniedException")
+  void updateTaskById_ClientRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+    TaskRequest request =
+        new TaskRequest(
+            "Update",
+            "Desc",
+            Instant.now(),
+            Instant.now(),
+            120,
+            TaskPriority.MEDIUM,
+            TaskStatus.IN_PROGRESS,
+            projectId,
+            Set.of());
+
+    assertThatThrownBy(() -> taskService.updateTaskById(taskId, request))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Clients cannot update tasks");
+  }
+
+  @Test
+  @DisplayName("deleteTaskById for CLIENT role should throw AccessDeniedException")
+  void deleteTaskById_ClientRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.CLIENT);
+
+    assertThatThrownBy(() -> taskService.deleteTaskById(taskId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Clients cannot delete tasks");
   }
 }

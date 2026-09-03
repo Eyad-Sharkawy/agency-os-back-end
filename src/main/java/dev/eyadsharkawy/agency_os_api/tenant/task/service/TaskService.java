@@ -4,6 +4,7 @@ import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
+import dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService;
 import dev.eyadsharkawy.agency_os_api.tenant.project.entity.Project;
 import dev.eyadsharkawy.agency_os_api.tenant.project.repository.ProjectRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.task.dto.TaskRequest;
@@ -31,11 +32,14 @@ public class TaskService {
   private final ProjectRepository projectRepository;
   private final TimeEntryRepository timeEntryRepository;
   private final UserWorkspaceRepository userWorkspaceRepository;
+  private final ClientUserRegistrationService clientUserRegistrationService;
 
   @Transactional
   public TaskResponse createTask(TaskRequest request) {
     log.info("Creating task [{}] for project [{}]", request.title(), request.projectId());
 
+    validateWriteAccess("create tasks");
+    validateAssignees(request);
     Project project = findProjectByIdOrThrow(request.projectId());
     Task task = new Task();
     task.mapFromRequestWithProject(request, project);
@@ -54,11 +58,23 @@ public class TaskService {
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.MEMBER) {
-        log.info("Member user [{}] queried tasks. Filtering by assigned tasks.", keycloakId);
-        return taskRepository.findByAssigneeId(keycloakId).stream()
-            .map(task -> TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId())))
-            .toList();
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.MEMBER) {
+          log.info("Member user [{}] queried tasks. Filtering by assigned tasks.", keycloakId);
+          return taskRepository.findByAssigneeId(keycloakId).stream()
+              .map(task -> TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId())))
+              .toList();
+        } else if (role == WorkspaceRole.CLIENT) {
+          log.info("Client user [{}] queried tasks. Filtering by client projects.", keycloakId);
+          var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+          if (clientIdOpt.isPresent()) {
+            return taskRepository.findByProjectClientId(clientIdOpt.get()).stream()
+                .map(task -> TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId())))
+                .toList();
+          }
+          return List.of();
+        }
       }
     }
 
@@ -72,8 +88,7 @@ public class TaskService {
     log.info("Fetching task with id: {}", id);
     Task task = findTaskByIdOrThrow(id);
 
-    // Member scope validation
-    validateMemberAccessToTask(task);
+    validateUserAccessToTask(task);
 
     return TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId()));
   }
@@ -93,12 +108,22 @@ public class TaskService {
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.MEMBER) {
-        // Members can only see their assigned tasks within that project
-        return tasks.stream()
-            .filter(task -> task.getAssigneeIds().contains(keycloakId))
-            .map(task -> TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId())))
-            .toList();
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.MEMBER) {
+          // Members can only see their assigned tasks within that project
+          return tasks.stream()
+              .filter(task -> task.getAssigneeIds().contains(keycloakId))
+              .map(task -> TaskResponse.fromEntity(task, getTotalLoggedTimeById(task.getId())))
+              .toList();
+        } else if (role == WorkspaceRole.CLIENT) {
+          Project project = findProjectByIdOrThrow(projectId);
+          var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+          if (clientIdOpt.isEmpty() || !clientIdOpt.get().equals(project.getClient().getId())) {
+            throw new AccessDeniedException(
+                "Access Denied: You cannot view tasks for this project.");
+          }
+        }
       }
     }
 
@@ -133,6 +158,8 @@ public class TaskService {
   @Transactional
   public TaskResponse updateTaskById(UUID id, TaskRequest request) {
     log.info("Updating task with id: {}", id);
+    validateWriteAccess("update tasks");
+    validateAssignees(request);
     Task task = findTaskByIdOrThrow(id);
 
     Project project = findProjectByIdOrThrow(request.projectId());
@@ -147,8 +174,7 @@ public class TaskService {
     log.info("Updating status for task with id: {}", id);
     Task task = findTaskByIdOrThrow(id);
 
-    // Member assignment check (Members can only update status of their assigned tasks)
-    validateMemberAccessToTask(task);
+    validateStatusUpdateAccess(task);
 
     task.setStatus(request.status());
     Task updated = taskRepository.save(task);
@@ -158,21 +184,77 @@ public class TaskService {
   @Transactional
   public void deleteTaskById(UUID id) {
     log.info("Deleting task with id: {}", id);
+    validateWriteAccess("delete tasks");
     Task task = findTaskByIdOrThrow(id);
     taskRepository.delete(task);
   }
 
-  private void validateMemberAccessToTask(Task task) {
+  private void validateAssignees(TaskRequest request) {
+    if (request.assigneeIds() == null || request.assigneeIds().isEmpty()) {
+      return;
+    }
+    String tenantId = TenantContextHolder.getTenantId();
+    if (tenantId != null
+        && userWorkspaceRepository.hasClientRoleAssignee(request.assigneeIds(), tenantId)) {
+      throw new IllegalArgumentException("Clients cannot be assigned to tasks.");
+    }
+  }
+
+  private void validateStatusUpdateAccess(Task task) {
     var authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
       String keycloakId = jwt.getSubject();
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent()
-          && roleOpt.get() == WorkspaceRole.MEMBER
-          && !task.getAssigneeIds().contains(keycloakId)) {
-        throw new AccessDeniedException("Access Denied: You are not assigned to this task.");
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.CLIENT) {
+          throw new AccessDeniedException(
+              "Access Denied: Clients are not allowed to update task status or move columns.");
+        }
+        if (role == WorkspaceRole.MEMBER && !task.getAssigneeIds().contains(keycloakId)) {
+          throw new AccessDeniedException("Access Denied: You are not assigned to this task.");
+        }
+      }
+    }
+  }
+
+  private void validateWriteAccess(String action) {
+    var authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+      String keycloakId = jwt.getSubject();
+      String tenantId = TenantContextHolder.getTenantId();
+
+      var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.CLIENT) {
+          throw new AccessDeniedException("Access Denied: Clients cannot " + action + ".");
+        }
+      }
+    }
+  }
+
+  private void validateUserAccessToTask(Task task) {
+    var authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+      String keycloakId = jwt.getSubject();
+      String tenantId = TenantContextHolder.getTenantId();
+
+      var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.MEMBER && !task.getAssigneeIds().contains(keycloakId)) {
+          throw new AccessDeniedException("Access Denied: You are not assigned to this task.");
+        } else if (role == WorkspaceRole.CLIENT) {
+          var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+          if (clientIdOpt.isEmpty()
+              || !clientIdOpt.get().equals(task.getProject().getClient().getId())) {
+            throw new AccessDeniedException(
+                "Access Denied: You are not authorized to access this task.");
+          }
+        }
       }
     }
   }

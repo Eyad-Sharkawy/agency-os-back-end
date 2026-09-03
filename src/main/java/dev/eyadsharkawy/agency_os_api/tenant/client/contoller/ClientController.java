@@ -39,22 +39,22 @@ public class ClientController {
   }
 
   @GetMapping
-  @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN', 'MEMBER')")
+  @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN', 'MEMBER', 'CLIENT')")
   @Operation(
       summary = "List all clients",
       description =
-          "Retrieves all registered client companies in the active tenant. Restricted to OWNER, ADMIN, or MEMBER.")
+          "Retrieves registered client companies. CLIENT users only receive their own client record; OWNER, ADMIN, MEMBER receive all.")
   ResponseEntity<List<ClientResponse>> getAllClients() {
     List<ClientResponse> responses = clientService.getAllClients();
     return ResponseEntity.ok(responses);
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN', 'MEMBER')")
+  @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN', 'MEMBER', 'CLIENT')")
   @Operation(
       summary = "Get client by ID",
       description =
-          "Retrieves metadata of a specific client company by its unique identifier. Restricted to OWNER, ADMIN, or MEMBER.")
+          "Retrieves metadata of a specific client company. Restricted to OWNER, ADMIN, MEMBER, or CLIENT (if linked to this client).")
   ResponseEntity<ClientResponse> getClientById(
       @Parameter(description = "The client company unique ID") @PathVariable UUID id) {
     ClientResponse response = clientService.getClientById(id);

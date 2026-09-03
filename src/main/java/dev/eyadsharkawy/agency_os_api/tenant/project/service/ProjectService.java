@@ -4,9 +4,9 @@ import dev.eyadsharkawy.agency_os_api.core.exceptions.ResourceNotFoundException;
 import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
+import dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService;
 import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
 import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.project.dto.ProjectRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.project.dto.ProjectResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.project.entity.Project;
@@ -30,7 +30,7 @@ public class ProjectService {
 
   private final ProjectRepository projectRepository;
   private final ClientRepository clientRepository;
-  private final ClientUserRepository clientUserRepository;
+  private final ClientUserRegistrationService clientUserRegistrationService;
   private final UserWorkspaceRepository userWorkspaceRepository;
 
   @Transactional
@@ -44,6 +44,11 @@ public class ProjectService {
               .findRoleByKeycloakIdAndTenantId(keycloakId, tenantId)
               .orElseThrow(
                   () -> new AccessDeniedException("Access Denied: Requester is not a member."));
+
+      if (role == WorkspaceRole.CLIENT) {
+        throw new AccessDeniedException(
+            "Access Denied: Clients are not allowed to create projects.");
+      }
 
       if (role != WorkspaceRole.OWNER && request.clientId() != null) {
         throw new AccessDeniedException(
@@ -84,9 +89,9 @@ public class ProjectService {
       if (roleOpt.isPresent()) {
         WorkspaceRole role = roleOpt.get();
         if (role == WorkspaceRole.CLIENT) {
-          var clientUserOpt = clientUserRepository.findById(keycloakId);
-          if (clientUserOpt.isPresent()) {
-            UUID clientId = clientUserOpt.get().getClient().getId();
+          var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+          if (clientIdOpt.isPresent()) {
+            UUID clientId = clientIdOpt.get();
             log.info(
                 "Client portal user [{}] queried projects. Filtering for client [{}]",
                 keycloakId,
@@ -132,7 +137,7 @@ public class ProjectService {
       if (roleOpt.isPresent()) {
         WorkspaceRole role = roleOpt.get();
         if (role == WorkspaceRole.CLIENT) {
-          validateClientProjectAccess(project, keycloakId);
+          validateClientProjectAccess(project, keycloakId, tenantId);
         } else if (role == WorkspaceRole.MEMBER
             && !projectRepository.isUserAssignedToProject(id, keycloakId)) {
           throw new AccessDeniedException(
@@ -142,10 +147,9 @@ public class ProjectService {
     }
   }
 
-  private void validateClientProjectAccess(Project project, String keycloakId) {
-    var clientUserOpt = clientUserRepository.findById(keycloakId);
-    if (clientUserOpt.isEmpty()
-        || !clientUserOpt.get().getClient().getId().equals(project.getClient().getId())) {
+  private void validateClientProjectAccess(Project project, String keycloakId, String tenantId) {
+    var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+    if (clientIdOpt.isEmpty() || !clientIdOpt.get().equals(project.getClient().getId())) {
       throw new AccessDeniedException(
           "Access Denied: You are not authorized to view this project.");
     }
@@ -181,6 +185,11 @@ public class ProjectService {
               .findRoleByKeycloakIdAndTenantId(keycloakId, tenantId)
               .orElseThrow(
                   () -> new AccessDeniedException("Access Denied: Requester is not a member."));
+
+      if (role == WorkspaceRole.CLIENT) {
+        throw new AccessDeniedException(
+            "Access Denied: Clients are not allowed to update projects.");
+      }
 
       if (role != WorkspaceRole.OWNER
           && request.clientId() != null
@@ -218,6 +227,17 @@ public class ProjectService {
         projectRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException(PROJECT_NOT_FOUND_PREFIX + id));
+
+    var authentication = SecurityContextHolder.getContext().getAuthentication();
+    if (authentication != null && authentication.getPrincipal() instanceof Jwt jwt) {
+      String keycloakId = jwt.getSubject();
+      String tenantId = TenantContextHolder.getTenantId();
+      var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
+      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
+        throw new AccessDeniedException(
+            "Access Denied: Clients are not allowed to delete projects.");
+      }
+    }
 
     projectRepository.delete(project);
   }

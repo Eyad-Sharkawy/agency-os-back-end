@@ -21,4 +21,16 @@ public interface UserWorkspaceRepository extends JpaRepository<UserWorkspace, Us
             """)
   Optional<WorkspaceRole> findRoleByKeycloakIdAndTenantId(
       @Param("keycloakId") String keycloakId, @Param("tenantId") String tenantId);
+
+  @Query(
+      """
+        SELECT COUNT(uw) > 0
+        FROM UserWorkspace uw
+        WHERE uw.user.keycloakId IN :keycloakIds
+          AND uw.workspace.tenantId = :tenantId
+          AND uw.role = dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole.CLIENT
+      """)
+  boolean hasClientRoleAssignee(
+      @Param("keycloakIds") java.util.Collection<String> keycloakIds,
+      @Param("tenantId") String tenantId);
 }
