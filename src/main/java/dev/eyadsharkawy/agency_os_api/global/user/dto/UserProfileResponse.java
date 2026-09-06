@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 
 @Schema(
-    name = "03.0. UserProfileResponse",
+    name = "00.1. UserProfileResponse",
     description = "Authenticated user profile details synchronized from Keycloak")
 public record UserProfileResponse(
     @Schema(

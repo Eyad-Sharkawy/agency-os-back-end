@@ -6,10 +6,11 @@ This document details the architectural design, security model, multi-tenancy im
 
 ## 1. Architectural Principles & Overview
 
-Agency OS is built on three core tenets:
+Agency OS is built on four core tenets:
 1. **Strict Data Isolation**: No two client workspaces share data tables. All workspace entities reside in isolated PostgreSQL schemas.
 2. **Stateless Scalability**: All incoming HTTP and WebSocket requests are authenticated via self-contained, digitally signed JSON Web Tokens (JWT) issued by Keycloak.
-3. **Reactive Real-Time Collaboration**: Stopwatch timers and time entry events are broadcast to active team members via STOMP/WebSocket connections.
+3. **Just-In-Time Profile Synchronization**: User identity details from Keycloak tokens are lazily synced to `public.app_users` on each authenticated request.
+4. **Reactive Real-Time Collaboration**: Live stopwatch timers and time entry events are broadcast to active team members via STOMP/WebSocket connections.
 
 ```mermaid
 graph TB
@@ -24,11 +25,13 @@ graph TB
     subgraph SecurityPipeline ["Spring Security 6 & Filter Pipeline"]
         CorsFilter["CorsFilter"]
         JwtFilter["BearerTokenAuthenticationFilter"]
+        UserSyncFilter["UserSyncFilter (JIT Sync)"]
         TenantFilter["TenantSecurityFilter"]
         RbacCheck["Method Security (@PreAuthorize / SpEL)"]
     end
 
     subgraph BusinessLayer ["Application & Domain Services"]
+        USR_SVC["UserSyncService"]
         WS_SVC["WorkspaceService"]
         CL_SVC["ClientService"]
         PR_SVC["ProjectService"]
@@ -47,7 +50,7 @@ graph TB
     subgraph DataLayer ["Data Access & Storage"]
         TenantConnProvider["TenantConnectionProvider (Schema Router)"]
         Hikari["HikariCP Connection Pool"]
-        PostgresPublic[("PostgreSQL: public schema<br/>(users, workspaces, memberships)")]
+        PostgresPublic[("PostgreSQL: public schema<br/>(users, workspaces, memberships, invitations)")]
         PostgresTenant1[("PostgreSQL: tenant_acme_1a2b3c")]
         PostgresTenantN[("PostgreSQL: tenant_...")]
     end
@@ -57,7 +60,8 @@ graph TB
     AngularApp <-->|3. STOMP Subscriptions| StompBroker
 
     CorsFilter --> JwtFilter
-    JwtFilter --> TenantFilter
+    JwtFilter --> UserSyncFilter
+    UserSyncFilter --> TenantFilter
     TenantFilter --> RbacCheck
     RbacCheck --> BusinessLayer
 
@@ -98,7 +102,7 @@ sequenceDiagram
     participant JDBC as PostgreSQL Connection
 
     Client->>Filter: HTTP Request [X-Tenant-ID: tenant_acme_123] + JWT
-    Filter->>Filter: Verify JWT user is member of 'tenant_acme_123'
+    Filter->>Filter: Verify JWT user is member of 'tenant_acme_123' in public.user_workspaces
     alt Valid Member
         Filter->>Context: setTenantId("tenant_acme_123")
         Filter->>Resolver: resolveCurrentTenantIdentifier() -> "tenant_acme_123"
@@ -140,16 +144,19 @@ HTTP Request
 1. BearerTokenAuthenticationFilter (Validates JWT signature & expiration)
     │
     ▼
-2. TenantSecurityFilter (Validates X-Tenant-ID membership against public.user_workspaces)
+2. UserSyncFilter (Synchronizes username, email, names into public.app_users)
     │
     ▼
-3. Controller Method Invocation
+3. TenantSecurityFilter (Validates X-Tenant-ID membership against public.user_workspaces)
     │
     ▼
-4. @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN')")
+4. Controller Method Invocation
     │
     ▼
-5. Service Layer (Applies business scoping: e.g., CLIENT only views own projects)
+5. @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN')")
+    │
+    ▼
+6. Service Layer (Applies business scoping: e.g., CLIENT only views own projects)
     │
     ▼
 Database Execution
@@ -180,7 +187,7 @@ STOMP frames bypass the standard servlet filter chain. Security is enforced via 
    - Extracts Bearer token from native STOMP headers (`Authorization` or `token`).
    - Uses `JwtDecoder` to validate the token and assigns a `JwtAuthenticationToken` principal to the WebSocket session.
 2. **`SUBSCRIBE` Frame**:
-   - Parses destination path (e.g., `/topic/{tenantId}/timers/start`).
+   - Parses destination path (e.g., `/topic/{tenantId}/timers/start`, `/topic/{tenantId}/timers/pause`, `/topic/{tenantId}/timers/resume`, `/topic/{tenantId}/timers/stop`, `/topic/{tenantId}/time-entries`).
    - Extracts `{tenantId}` and verifies via database that the authenticated principal belongs to that tenant.
    - Throws `AccessDeniedException` if unauthorized, triggering [`CustomStompErrorHandler`](../src/main/java/dev/eyadsharkawy/agency_os_api/core/exceptions/CustomStompErrorHandler.java).
 

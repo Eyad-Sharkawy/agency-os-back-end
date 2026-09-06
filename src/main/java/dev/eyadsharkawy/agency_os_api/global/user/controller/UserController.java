@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/users")
 @RequiredArgsConstructor
-@Tag(name = "03. Users", description = "User profile and synchronization management")
+@Tag(name = "00. Users", description = "User profile and synchronization management")
 @SecurityRequirement(name = "bearerAuth")
 public class UserController {
 

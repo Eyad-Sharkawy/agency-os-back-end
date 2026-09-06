@@ -2,15 +2,41 @@
   "info": {
     "_postman_id": "8b4652c8-b61e-401c-a4e1-5b6b637153f2",
     "name": "Agency OS API",
-    "description": "Complete Multi-Tenant Agency-OS backend endpoint collection, including Workspace, Client, Project, Task, Time Tracking, and Automated Invoice generation.",
+    "description": "Complete Multi-Tenant Agency-OS backend endpoint collection, including User Profile, Workspace, Invitations, Client CRM, Project Scoping, Task Workflows, Real-Time Stopwatch Time Tracking, and Automated PDF Invoice generation.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
+      "name": "0. User Profile (Global)",
+      "item": [
+        {
+          "name": "Get Current Authenticated User Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Retrieves the synchronized user profile for the currently authenticated Keycloak account."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "1. Workspace (Global)",
       "item": [
         {
-          "name": "Register Workspace",
+          "name": "Create Workspace",
           "request": {
             "method": "POST",
             "header": [
@@ -21,7 +47,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Sharkawy Design Agency\"\n}"
+              "raw": "{\n  \"name\": \"Sharkawy Design Agency\",\n  \"contactEmail\": \"contact@sharkawy.design\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/workspaces",
@@ -34,7 +60,7 @@
                 "workspaces"
               ]
             },
-            "description": "Registers a new tenant workspace globally. Returns the tenantSlug (e.g. tenant_sharkawy_design_agency)."
+            "description": "Registers a new tenant workspace globally. The caller becomes OWNER and a PostgreSQL schema is provisioned."
           },
           "response": []
         },
@@ -54,12 +80,12 @@
                 "workspaces"
               ]
             },
-            "description": "Retrieves all workspaces that the currently logged-in user belongs to."
+            "description": "Retrieves all workspace organizations where the current authenticated user holds active membership."
           },
           "response": []
         },
         {
-          "name": "Update Workspace",
+          "name": "Update Workspace Settings",
           "request": {
             "method": "PUT",
             "header": [
@@ -70,7 +96,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Sharkawy Design Agency Updated\"\n}"
+              "raw": "{\n  \"name\": \"Sharkawy Design Agency Global\",\n  \"contactEmail\": \"admin@sharkawy.design\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId",
@@ -86,11 +112,11 @@
               "variable": [
                 {
                   "key": "tenantId",
-                  "value": ""
+                  "value": "{{tenantId}}"
                 }
               ]
             },
-            "description": "Updates a workspace's details by its tenantId slug."
+            "description": "Updates workspace name or contact email. Restricted strictly to the OWNER."
           },
           "response": []
         },
@@ -113,94 +139,44 @@
               "variable": [
                 {
                   "key": "tenantId",
-                  "value": ""
+                  "value": "{{tenantId}}"
                 }
               ]
             },
-            "description": "Deletes a workspace by its tenantId slug."
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "2. Clients",
-      "item": [
-        {
-          "name": "Create Client",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Acme Corp\",\n  \"email\": \"billing@acme.com\",\n  \"status\": \"ACTIVE\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/clients",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "clients"
-              ]
-            }
+            "description": "Soft-deletes a workspace organization. Restricted strictly to the OWNER."
           },
           "response": []
         },
         {
-          "name": "Get All Clients",
+          "name": "List Workspace Members",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/clients",
+              "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId/members",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "clients"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Client By ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/clients/:id",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "clients",
-                ":id"
+                "workspaces",
+                ":tenantId",
+                "members"
               ],
               "variable": [
                 {
-                  "key": "id",
-                  "value": ""
+                  "key": "tenantId",
+                  "value": "{{tenantId}}"
                 }
               ]
-            }
+            },
+            "description": "Lists all members in the specified workspace with their assigned roles. Restricted to OWNER and ADMIN."
           },
           "response": []
         },
         {
-          "name": "Update Client",
+          "name": "Update Member Role",
           "request": {
             "method": "PUT",
             "header": [
@@ -211,62 +187,71 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Acme Corp Revised\",\n  \"email\": \"billing-new@acme.com\",\n  \"status\": \"ACTIVE\"\n}"
+              "raw": "{\n  \"role\": \"ADMIN\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/clients/:id",
+              "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId/members/:userId",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "clients",
-                ":id"
+                "workspaces",
+                ":tenantId",
+                "members",
+                ":userId"
               ],
               "variable": [
                 {
-                  "key": "id",
-                  "value": ""
+                  "key": "tenantId",
+                  "value": "{{tenantId}}"
+                },
+                {
+                  "key": "userId",
+                  "value": "{{memberUserId}}"
                 }
               ]
-            }
+            },
+            "description": "Updates a member's role (ADMIN, MEMBER, CLIENT). Restricted to OWNER or ADMIN."
           },
           "response": []
         },
         {
-          "name": "Delete Client",
+          "name": "Remove Member from Workspace",
           "request": {
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/clients/:id",
+              "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId/members/:userId",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "clients",
-                ":id"
+                "workspaces",
+                ":tenantId",
+                "members",
+                ":userId"
               ],
               "variable": [
                 {
-                  "key": "id",
-                  "value": ""
+                  "key": "tenantId",
+                  "value": "{{tenantId}}"
+                },
+                {
+                  "key": "userId",
+                  "value": "{{memberUserId}}"
                 }
               ]
-            }
+            },
+            "description": "Removes a user from the workspace. Restricted to OWNER or ADMIN."
           },
           "response": []
-        }
-      ]
-    },
-    {
-      "name": "3. Projects",
-      "item": [
+        },
         {
-          "name": "Create Project",
+          "name": "Transfer Workspace Ownership",
           "request": {
             "method": "POST",
             "header": [
@@ -277,7 +262,341 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Mobile Application Phase 1\",\n  \"description\": \"Initial MVP development of the mobile application for iOS and Android.\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 12000.00,\n  \"status\": \"PLANNING\",\n  \"billingRate\": 125.00\n}"
+              "raw": "{\n  \"newOwnerId\": \"{{memberUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId/transfer-ownership",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces",
+                ":tenantId",
+                "transfer-ownership"
+              ],
+              "variable": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenantId}}"
+                }
+              ]
+            },
+            "description": "Transfers OWNER role to another member. Demotes current caller to ADMIN. Restricted to OWNER."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Workspace Invitations (Global)",
+      "item": [
+        {
+          "name": "Send Workspace Invitation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"designer@example.com\",\n  \"role\": \"MEMBER\",\n  \"clientId\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/:tenantId/invitations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces",
+                ":tenantId",
+                "invitations"
+              ],
+              "variable": [
+                {
+                  "key": "tenantId",
+                  "value": "{{tenantId}}"
+                }
+              ]
+            },
+            "description": "Sends an invitation to a user by username or email. Restricted to OWNER or ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "List Pending Invitations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/invitations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces",
+                "invitations"
+              ]
+            },
+            "description": "Retrieves all pending workspace invitations sent to the authenticated user."
+          },
+          "response": []
+        },
+        {
+          "name": "Accept Invitation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/invitations/:invitationId/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces",
+                "invitations",
+                ":invitationId",
+                "accept"
+              ],
+              "variable": [
+                {
+                  "key": "invitationId",
+                  "value": "{{invitationId}}"
+                }
+              ]
+            },
+            "description": "Accepts a pending invitation and joins the workspace."
+          },
+          "response": []
+        },
+        {
+          "name": "Decline Invitation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/workspaces/invitations/:invitationId/decline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "workspaces",
+                "invitations",
+                ":invitationId",
+                "decline"
+              ],
+              "variable": [
+                {
+                  "key": "invitationId",
+                  "value": "{{invitationId}}"
+                }
+              ]
+            },
+            "description": "Declines a pending workspace invitation."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Clients",
+      "item": [
+        {
+          "name": "Create Client",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Wayne Enterprises\",\n  \"email\": \"billing@wayne.com\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients"
+              ]
+            },
+            "description": "Registers a new client company in the active tenant. Restricted to OWNER or ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Clients",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients"
+              ]
+            },
+            "description": "Lists all client companies in the workspace. OWNER/ADMIN/MEMBER receive all, CLIENT receives own company."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Client By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{clientId}}"
+                }
+              ]
+            },
+            "description": "Retrieves client details by ID."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Client Details",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Wayne Enterprises Global\",\n  \"email\": \"billing-global@wayne.com\",\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{clientId}}"
+                }
+              ]
+            },
+            "description": "Updates client details. Restricted strictly to the OWNER."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Client",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clients/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clients",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{clientId}}"
+                }
+              ]
+            },
+            "description": "Soft-deletes client and cascades soft-delete to associated projects. Restricted to OWNER."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Projects",
+      "item": [
+        {
+          "name": "Create Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"E-Commerce Redesign\",\n  \"description\": \"Full redesign and replatforming to Next.js and Headless Shopify\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 25000.00,\n  \"billingRate\": 150.00,\n  \"status\": \"IN_PROGRESS\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/projects",
@@ -289,7 +608,8 @@
                 "v1",
                 "projects"
               ]
-            }
+            },
+            "description": "Creates a new project under the tenant. Only OWNER can assign a clientId during creation."
           },
           "response": []
         },
@@ -297,7 +617,12 @@
           "name": "Get All Projects",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/projects",
               "host": [
@@ -308,7 +633,8 @@
                 "v1",
                 "projects"
               ]
-            }
+            },
+            "description": "Lists projects. OWNER/ADMIN see all, MEMBER sees assigned projects, CLIENT sees contracted projects."
           },
           "response": []
         },
@@ -316,7 +642,12 @@
           "name": "Get Project By ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/projects/:id",
               "host": [
@@ -331,10 +662,11 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{projectId}}"
                 }
               ]
-            }
+            },
+            "description": "Retrieves project by ID with role-based scoping checks."
           },
           "response": []
         },
@@ -342,7 +674,12 @@
           "name": "Get Projects By Client ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/projects/client/:clientId",
               "host": [
@@ -358,26 +695,31 @@
               "variable": [
                 {
                   "key": "clientId",
-                  "value": ""
+                  "value": "{{clientId}}"
                 }
               ]
-            }
+            },
+            "description": "Lists all projects associated with a specific client. Restricted to OWNER, ADMIN, or MEMBER."
           },
           "response": []
         },
         {
-          "name": "Update Project",
+          "name": "Update Project Details",
           "request": {
             "method": "PUT",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Mobile Application Phase 1 - Updated\",\n  \"description\": \"Updated scope with backend push notification services.\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 15000.00,\n  \"status\": \"IN_PROGRESS\",\n  \"billingRate\": 130.00\n}"
+              "raw": "{\n  \"name\": \"E-Commerce Redesign (Phase 2)\",\n  \"description\": \"Expanded scope including mobile app API integration\",\n  \"clientId\": \"{{clientId}}\",\n  \"budget\": 35000.00,\n  \"billingRate\": 160.00,\n  \"status\": \"IN_PROGRESS\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/projects/:id",
@@ -393,10 +735,11 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{projectId}}"
                 }
               ]
-            }
+            },
+            "description": "Updates project details. Changing clientId requires OWNER. Restricted to OWNER or ADMIN."
           },
           "response": []
         },
@@ -404,7 +747,12 @@
           "name": "Delete Project",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/projects/:id",
               "host": [
@@ -419,17 +767,18 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{projectId}}"
                 }
               ]
-            }
+            },
+            "description": "Permanently deletes a project. Restricted strictly to OWNER."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "4. Tasks",
+      "name": "5. Tasks",
       "item": [
         {
           "name": "Create Task",
@@ -439,11 +788,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Implement Authentication Flow\",\n  \"description\": \"Integrate Keycloak OAuth2 flow inside the Spring Boot resource server and secure communication paths.\",\n  \"startDate\": \"2026-08-10T09:00:00Z\",\n  \"dueDate\": \"2026-08-15T18:00:00Z\",\n  \"estimatedMinutes\": 480,\n  \"priority\": \"HIGH\",\n  \"status\": \"IN_PROGRESS\",\n  \"projectId\": \"{{projectId}}\",\n  \"assigneeIds\": [\n    \"7f86adf9-d165-45db-8305-1c263f6846ce\"\n  ]\n}"
+              "raw": "{\n  \"title\": \"Design Checkout Flow\",\n  \"description\": \"Create high-fidelity wireframes in Figma\",\n  \"startDate\": \"2026-08-15T09:00:00Z\",\n  \"dueDate\": \"2026-08-25T18:00:00Z\",\n  \"estimatedMinutes\": 480,\n  \"priority\": \"HIGH\",\n  \"status\": \"TODO\",\n  \"projectId\": \"{{projectId}}\",\n  \"assigneeIds\": [\n    \"{{memberUserId}}\"\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/tasks",
@@ -455,7 +808,8 @@
                 "v1",
                 "tasks"
               ]
-            }
+            },
+            "description": "Creates a task under a project with assignees and budget estimates. Restricted to OWNER or ADMIN."
           },
           "response": []
         },
@@ -463,7 +817,12 @@
           "name": "Get All Tasks",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/tasks",
               "host": [
@@ -474,7 +833,8 @@
                 "v1",
                 "tasks"
               ]
-            }
+            },
+            "description": "Lists tasks. MEMBER users only receive tasks assigned directly to them."
           },
           "response": []
         },
@@ -482,7 +842,12 @@
           "name": "Get Task By ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/tasks/:id",
               "host": [
@@ -497,10 +862,11 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{taskId}}"
                 }
               ]
-            }
+            },
+            "description": "Retrieves task details. Verifies that MEMBER users are assigned to this task."
           },
           "response": []
         },
@@ -508,7 +874,12 @@
           "name": "Get Tasks By Project ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/tasks/project/:projectId",
               "host": [
@@ -524,10 +895,11 @@
               "variable": [
                 {
                   "key": "projectId",
-                  "value": ""
+                  "value": "{{projectId}}"
                 }
               ]
-            }
+            },
+            "description": "Lists all tasks for a specific project. Filtered to assigned tasks for MEMBER users."
           },
           "response": []
         },
@@ -535,7 +907,12 @@
           "name": "Get Tasks By Assignee ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/tasks/assignee/:assigneeId",
               "host": [
@@ -551,26 +928,31 @@
               "variable": [
                 {
                   "key": "assigneeId",
-                  "value": ""
+                  "value": "{{memberUserId}}"
                 }
               ]
-            }
+            },
+            "description": "Lists tasks assigned to a specific user. MEMBER users are limited to their own ID."
           },
           "response": []
         },
         {
-          "name": "Update Task",
+          "name": "Update Task Details",
           "request": {
             "method": "PUT",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Implement Authentication Flow (Refactored)\",\n  \"description\": \"Include WebSockets STOMP connection security checks in the channel interceptors.\",\n  \"startDate\": \"2026-08-10T09:00:00Z\",\n  \"dueDate\": \"2026-08-16T18:00:00Z\",\n  \"estimatedMinutes\": 600,\n  \"priority\": \"URGENT\",\n  \"status\": \"IN_PROGRESS\",\n  \"projectId\": \"{{projectId}}\",\n  \"assigneeIds\": [\n    \"7f86adf9-d165-45db-8305-1c263f6846ce\"\n  ]\n}"
+              "raw": "{\n  \"title\": \"Design Checkout Flow & Responsive Mobile\",\n  \"description\": \"Include dark mode wireframes and Stripe modal checkout\",\n  \"startDate\": \"2026-08-15T09:00:00Z\",\n  \"dueDate\": \"2026-08-28T18:00:00Z\",\n  \"estimatedMinutes\": 600,\n  \"priority\": \"URGENT\",\n  \"status\": \"IN_PROGRESS\",\n  \"projectId\": \"{{projectId}}\",\n  \"assigneeIds\": [\n    \"{{memberUserId}}\"\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/tasks/:id",
@@ -586,10 +968,52 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{taskId}}"
                 }
               ]
-            }
+            },
+            "description": "Full task update. Restricted to OWNER or ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Task Status (Kanban)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tasks/:id/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tasks",
+                ":id",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{taskId}}"
+                }
+              ]
+            },
+            "description": "Quick status update for Kanban drag-and-drop. MEMBER users can only update status on assigned tasks."
           },
           "response": []
         },
@@ -597,7 +1021,12 @@
           "name": "Delete Task",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/tasks/:id",
               "host": [
@@ -612,17 +1041,18 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{taskId}}"
                 }
               ]
-            }
+            },
+            "description": "Permanently deletes a task. Restricted to OWNER or ADMIN."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "5. Time Tracking (Stopwatch & Logs)",
+      "name": "6. Time Tracking (Stopwatch & Logs)",
       "item": [
         {
           "name": "Log Time Manually",
@@ -632,6 +1062,10 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
               }
             ],
             "body": {
@@ -648,7 +1082,45 @@
                 "v1",
                 "time-entries"
               ]
-            }
+            },
+            "description": "Manually records a time entry for an assigned task. Broadcasts to /topic/{tenantId}/time-entries."
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Time Entries (Filtered)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries?taskId={{taskId}}&userId={{memberUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries"
+              ],
+              "query": [
+                {
+                  "key": "taskId",
+                  "value": "{{taskId}}",
+                  "disabled": true
+                },
+                {
+                  "key": "userId",
+                  "value": "{{memberUserId}}",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Retrieves the list of all logged time entries in the current workspace, optionally filtered by taskId or userId."
           },
           "response": []
         },
@@ -656,7 +1128,12 @@
           "name": "Start Stopwatch",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/time-entries/start/:taskId",
               "host": [
@@ -672,10 +1149,63 @@
               "variable": [
                 {
                   "key": "taskId",
-                  "value": ""
+                  "value": "{{taskId}}"
                 }
               ]
-            }
+            },
+            "description": "Starts a live stopwatch timer on an assigned task (1 active timer per user). Broadcasts to /topic/{tenantId}/timers/start."
+          },
+          "response": []
+        },
+        {
+          "name": "Pause Stopwatch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries/pause",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries",
+                "pause"
+              ]
+            },
+            "description": "Pauses the currently running stopwatch timer and saves elapsed time. Broadcasts to /topic/{tenantId}/timers/pause."
+          },
+          "response": []
+        },
+        {
+          "name": "Resume Stopwatch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/time-entries/resume",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "time-entries",
+                "resume"
+              ]
+            },
+            "description": "Resumes a paused stopwatch timer for the user. Broadcasts to /topic/{tenantId}/timers/resume."
           },
           "response": []
         },
@@ -683,7 +1213,12 @@
           "name": "Stop Stopwatch",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/time-entries/stop?isBillable=true",
               "host": [
@@ -699,9 +1234,15 @@
                 {
                   "key": "isBillable",
                   "value": "true"
+                },
+                {
+                  "key": "durationMinutes",
+                  "value": "120",
+                  "disabled": true
                 }
               ]
-            }
+            },
+            "description": "Stops the active stopwatch, saves a TimeEntry, and broadcasts to /topic/{tenantId}/timers/stop."
           },
           "response": []
         },
@@ -709,7 +1250,12 @@
           "name": "Get Running Active Timer",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/time-entries/active",
               "host": [
@@ -721,7 +1267,8 @@
                 "time-entries",
                 "active"
               ]
-            }
+            },
+            "description": "Retrieves the active running stopwatch timer metadata, or returns 204 No Content if none."
           },
           "response": []
         },
@@ -729,7 +1276,12 @@
           "name": "Get Time Entries By Task ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/time-entries/task/:taskId",
               "host": [
@@ -745,10 +1297,11 @@
               "variable": [
                 {
                   "key": "taskId",
-                  "value": ""
+                  "value": "{{taskId}}"
                 }
               ]
-            }
+            },
+            "description": "Returns all logged time entries associated with a specific task."
           },
           "response": []
         },
@@ -756,7 +1309,12 @@
           "name": "Get Time Entries By User ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/time-entries/user/:userId",
               "host": [
@@ -772,10 +1330,11 @@
               "variable": [
                 {
                   "key": "userId",
-                  "value": ""
+                  "value": "{{memberUserId}}"
                 }
               ]
-            }
+            },
+            "description": "Returns all logged time entries submitted by a specific user."
           },
           "response": []
         },
@@ -783,7 +1342,12 @@
           "name": "Delete Time Entry",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/time-entries/:id",
               "host": [
@@ -798,17 +1362,18 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{timeEntryId}}"
                 }
               ]
-            }
+            },
+            "description": "Deletes a recorded time entry."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "6. Invoices",
+      "name": "7. Invoices",
       "item": [
         {
           "name": "Auto-Generate Invoice",
@@ -818,11 +1383,15 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"clientId\": \"{{clientId}}\",\n  \"status\": \"DRAFT\"\n}"
+              "raw": "{\n  \"clientId\": \"{{clientId}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/invoices",
@@ -835,7 +1404,7 @@
                 "invoices"
               ]
             },
-            "description": "Pulls all unbilled billable time entries for the client, calculates invoice total using project rates, locks entries, and saves invoice."
+            "description": "Consolidates all unbilled time entries for a client and auto-generates an invoice. Restricted to OWNER."
           },
           "response": []
         },
@@ -843,7 +1412,12 @@
           "name": "Get All Invoices",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/invoices",
               "host": [
@@ -854,7 +1428,8 @@
                 "v1",
                 "invoices"
               ]
-            }
+            },
+            "description": "Lists invoices. OWNER/ADMIN see all, CLIENT sees own invoices, MEMBER is blocked (403)."
           },
           "response": []
         },
@@ -862,7 +1437,12 @@
           "name": "Get Invoice By ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/invoices/:id",
               "host": [
@@ -877,10 +1457,11 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{invoiceId}}"
                 }
               ]
-            }
+            },
+            "description": "Retrieves invoice metadata and itemized details."
           },
           "response": []
         },
@@ -888,7 +1469,12 @@
           "name": "Get Invoices By Client ID",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/invoices/client/:clientId",
               "host": [
@@ -904,21 +1490,26 @@
               "variable": [
                 {
                   "key": "clientId",
-                  "value": ""
+                  "value": "{{clientId}}"
                 }
               ]
-            }
+            },
+            "description": "Lists all invoices generated for a specific client company. Restricted to OWNER or ADMIN."
           },
           "response": []
         },
         {
-          "name": "Update Invoice Status/Client",
+          "name": "Update Invoice Status",
           "request": {
             "method": "PUT",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
               }
             ],
             "body": {
@@ -939,10 +1530,11 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{invoiceId}}"
                 }
               ]
-            }
+            },
+            "description": "Modifies invoice status (DRAFT, SENT, PAID, OVERDUE). Restricted strictly to OWNER."
           },
           "response": []
         },
@@ -950,7 +1542,12 @@
           "name": "Delete Invoice",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/invoices/:id",
               "host": [
@@ -965,11 +1562,11 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{invoiceId}}"
                 }
               ]
             },
-            "description": "Deletes the invoice. The database will automatically set the linked time entries' invoice_id back to NULL, unlocking them for billing again."
+            "description": "Deletes invoice and returns linked time entries to unbilled status. Restricted strictly to OWNER."
           },
           "response": []
         },
@@ -977,7 +1574,12 @@
           "name": "Download PDF Invoice",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "X-Tenant-ID",
+                "value": "{{tenantId}}"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/invoices/:id/pdf",
               "host": [
@@ -993,11 +1595,11 @@
               "variable": [
                 {
                   "key": "id",
-                  "value": ""
+                  "value": "{{invoiceId}}"
                 }
               ]
             },
-            "description": "Returns raw PDF byte stream with inline content disposition. Postman can render this PDF directly in the response viewer."
+            "description": "Renders and streams a print-ready vector PDF document rendered with Apache PDFBox."
           },
           "response": []
         }
@@ -1019,18 +1621,6 @@
       }
     ]
   },
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "// Set global variable for null byte termination required for manual STOMP frames",
-          "pm.globals.set(\"NULL_CHAR\", \"\\0\");"
-        ]
-      }
-    }
-  ],
   "variable": [
     {
       "key": "baseUrl",
@@ -1044,22 +1634,42 @@
     },
     {
       "key": "tenantId",
-      "value": "tenant_contact_2148d8",
+      "value": "tenant_acme_agency_9e3d21",
+      "type": "string"
+    },
+    {
+      "key": "memberUserId",
+      "value": "5a2deb4d-1b2c-3def-8bad-1c0d7b3dcb99",
+      "type": "string"
+    },
+    {
+      "key": "invitationId",
+      "value": "e3b0c442-98fc-1c14-9afbf4c8996fb924",
       "type": "string"
     },
     {
       "key": "clientId",
-      "value": "",
+      "value": "8f3b2d1e-4c5a-6b7d-8e9f-0a1b2c3d4e5f",
       "type": "string"
     },
     {
       "key": "projectId",
-      "value": "",
+      "value": "7a9e3e7f-4567-4890-a123-abcdef123456",
       "type": "string"
     },
     {
       "key": "taskId",
-      "value": "",
+      "value": "3c2a1b0f-9876-5432-10fe-dcba09876543",
+      "type": "string"
+    },
+    {
+      "key": "timeEntryId",
+      "value": "bb2a1b0f-1111-2222-3333-dcba09876543",
+      "type": "string"
+    },
+    {
+      "key": "invoiceId",
+      "value": "11223344-5566-7788-99aa-bbccddeeff00",
       "type": "string"
     }
   ]

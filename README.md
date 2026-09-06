@@ -17,6 +17,7 @@
 - [System Architecture](#-system-architecture)
 - [Domain Model & Entity Relationships](#-domain-model--entity-relationships)
 - [Complete REST API Reference](#-complete-rest-api-reference)
+  - [0. Users (`/api/v1/users`)](#0-users-apiv1users)
   - [1. Workspaces (`/api/v1/workspaces`)](#1-workspaces-apiv1workspaces)
   - [2. Workspace Invitations (`/api/v1/workspaces`)](#2-workspace-invitations-apiv1workspaces)
   - [3. Clients (`/api/v1/clients`)](#3-clients-apiv1clients)
@@ -44,11 +45,12 @@
 | Capability | Description |
 |---|---|
 | **Multi-Tenancy** | Schema-per-tenant isolation (`tenant_<slug>_<suffix>`) ensuring 100% data separation between client workspaces. |
+| **User Profile & Sync** | Keycloak JIT (Just-In-Time) user synchronization storing profile snapshots in PostgreSQL `public.app_users`. |
 | **Workspace Management** | Create isolated organizations, invite teammates by email/username, and manage role-based memberships. |
 | **Client CRM** | Track client accounts with lifecycle stages (`PROSPECT`, `ACTIVE`, `INACTIVE`) and mapped external client portal logins. |
 | **Project Management** | Plan projects with fixed budgets, hourly billing rates (`billingRate`), delivery statuses, and client-scoping. |
 | **Task Backlog & Board** | Create tasks with assignees, priority workflows (`LOW` → `URGENT`), due dates, and budget health calculations. |
-| **Live Time Tracking** | Log hours manually or run live stopwatch timers broadcasting real-time updates across team dashboards via WebSockets. |
+| **Live Time Tracking** | Log hours manually or run live stopwatch timers (start/pause/resume/stop) broadcasting real-time updates across team dashboards via WebSockets. |
 | **Automated Invoicing** | Aggregate unbilled billable hours, compute amounts from project hourly rates, and generate print-ready branded PDF invoices. |
 | **Enterprise Security** | Keycloak OpenID Connect / OAuth2 Resource Server validation with PKCE and SpEL method-level authorization. |
 
@@ -87,6 +89,7 @@ graph TB
 
     subgraph Security ["Spring Security Filter Chain"]
         SF["BearerTokenAuthenticationFilter"]
+        UF["UserSyncFilter<br/>(JIT Profile Sync)"]
         TF["TenantSecurityFilter<br/>(Validates X-Tenant-ID)"]
     end
 
@@ -96,7 +99,7 @@ graph TB
     end
 
     subgraph Services ["Service Layer"]
-        SVC["Domain Services<br/>(Workspace, Client, Project, Task, Time, Invoice)"]
+        SVC["Domain Services<br/>(User, Workspace, Client, Project, Task, Time, Invoice)"]
         PDF["PDFBox Invoice Engine"]
         PROV["Tenant Schema Provisioner<br/>(Dynamic Flyway)"]
     end
@@ -111,7 +114,8 @@ graph TB
     FE -->|2. Bearer JWT + X-Tenant-ID| SF
     FE <-->|3. STOMP Subscriptions| WSB
     KC -.->|Validate JWT Signature| SF
-    SF --> TF
+    SF --> UF
+    UF --> TF
     TF --> REST
     REST --> SVC
     SVC --> PDF
@@ -247,6 +251,9 @@ erDiagram
         string userId PK "Keycloak sub (1 per user)"
         UUID taskId FK
         Instant startTime
+        int accumulatedSeconds
+        boolean isPaused
+        Instant lastPausedAt
     }
 
     Invoice {
@@ -265,6 +272,14 @@ erDiagram
 
 > **Authentication**: All endpoints require `Authorization: Bearer <JWT>` from Keycloak.  
 > **Multi-Tenancy**: All non-global endpoints require `X-Tenant-ID: <tenantId>` in the request headers.
+
+### 0. Users (`/api/v1/users`)
+
+| Method | Path | Required Role | Description |
+|---|---|---|---|
+| `GET` | `/api/v1/users/me` | Authenticated User | Retrieves synchronized profile for authenticated Keycloak user |
+
+---
 
 ### 1. Workspaces (`/api/v1/workspaces`)
 
@@ -297,8 +312,8 @@ erDiagram
 | Method | Path | Required Role | Description |
 |---|---|---|---|
 | `POST` | `/api/v1/clients` | `OWNER`, `ADMIN` | Create a new client company profile |
-| `GET` | `/api/v1/clients` | `OWNER`, `ADMIN`, `MEMBER` | List all client profiles in the current workspace |
-| `GET` | `/api/v1/clients/{id}` | `OWNER`, `ADMIN`, `MEMBER` | Get client details by UUID |
+| `GET` | `/api/v1/clients` | `OWNER`, `ADMIN`, `MEMBER`, `CLIENT` | List all client profiles (`CLIENT` scoped to own company) |
+| `GET` | `/api/v1/clients/{id}` | `OWNER`, `ADMIN`, `MEMBER`, `CLIENT` | Get client details by UUID |
 | `PUT` | `/api/v1/clients/{id}` | `OWNER` | Update client name, email, or lifecycle status |
 | `DELETE` | `/api/v1/clients/{id}` | `OWNER` | Soft-delete client and cascade soft-deletion to projects |
 
@@ -325,7 +340,7 @@ erDiagram
 | `GET` | `/api/v1/tasks` | All Workspace Roles | `MEMBER` sees assigned tasks; `OWNER`/`ADMIN` see all tasks |
 | `GET` | `/api/v1/tasks/{id}` | All Workspace Roles | Get task by ID (verifies assignment for `MEMBER`) |
 | `GET` | `/api/v1/tasks/project/{projectId}` | All Workspace Roles | List tasks under a project |
-| `GET` | `/api/v1/tasks/assignee/{assigneeId}`| All Workspace Roles | List tasks assigned to a specific user (`MEMBER` limited to self) |
+| `GET` | `/api/v1/tasks/assignee/{assigneeId}`| `OWNER`, `ADMIN`, `MEMBER` | List tasks assigned to a specific user (`MEMBER` limited to self) |
 | `PUT` | `/api/v1/tasks/{id}` | `OWNER`, `ADMIN` | Complete update of task fields |
 | `PATCH` | `/api/v1/tasks/{id}/status` | `OWNER`, `ADMIN`, `MEMBER` | Quick workflow status update (`TODO` → `IN_PROGRESS` → `REVIEW` → `DONE`; `MEMBER` restricted to assigned tasks) |
 | `DELETE` | `/api/v1/tasks/{id}` | `OWNER`, `ADMIN` | Delete task |
@@ -338,8 +353,11 @@ erDiagram
 
 | Method | Path | Required Role | Description & Real-Time Broadcast |
 |---|---|---|---|
-| `POST` | `/api/v1/time-entries` | `OWNER`, `ADMIN`, `MEMBER` | Manually log time entry (OWNER/ADMIN can log on behalf of assigned members) → broadcasts to `/topic/{tenantId}/time-entries` |
-| `POST` | `/api/v1/time-entries/start/{taskId}` | `OWNER`, `ADMIN`, `MEMBER` | Start stopwatch timer on assigned task (1 active timer per user limit) → broadcasts to `/topic/{tenantId}/timers/start` |
+| `POST` | `/api/v1/time-entries` | `OWNER`, `ADMIN`, `MEMBER` | Manually log time entry → broadcasts to `/topic/{tenantId}/time-entries` |
+| `GET` | `/api/v1/time-entries` | `OWNER`, `ADMIN`, `MEMBER` | List time entries (optional `taskId`, `userId` query parameters) |
+| `POST` | `/api/v1/time-entries/start/{taskId}` | `OWNER`, `ADMIN`, `MEMBER` | Start stopwatch timer on assigned task → broadcasts to `/topic/{tenantId}/timers/start` |
+| `POST` | `/api/v1/time-entries/pause` | `OWNER`, `ADMIN`, `MEMBER` | Pause currently running stopwatch timer → broadcasts to `/topic/{tenantId}/timers/pause` |
+| `POST` | `/api/v1/time-entries/resume` | `OWNER`, `ADMIN`, `MEMBER` | Resume paused stopwatch timer → broadcasts to `/topic/{tenantId}/timers/resume` |
 | `POST` | `/api/v1/time-entries/stop` | `OWNER`, `ADMIN`, `MEMBER` | Stop stopwatch timer, compute duration, record `TimeEntry` → broadcasts to `/topic/{tenantId}/timers/stop` |
 | `GET` | `/api/v1/time-entries/active` | `OWNER`, `ADMIN`, `MEMBER` | Retrieve currently active running stopwatch timer for logged-in user |
 | `GET` | `/api/v1/time-entries/task/{taskId}` | `OWNER`, `ADMIN`, `MEMBER` | List all time entries recorded for a task |
@@ -378,11 +396,12 @@ sequenceDiagram
     KC-->>User: 2. Return Access Token (Bearer JWT)
     User->>API: 3. HTTP Request [Authorization: Bearer <JWT>] + [X-Tenant-ID: tenant_slug]
     API->>API: 4. BearerTokenAuthenticationFilter: Decode & verify JWT signature
-    API->>DB: 5. TenantSecurityFilter: Verify User ID is active member in public.user_workspaces
-    API->>DB: 6. TenantConnectionProvider: Switch connection: SET search_path TO tenant_slug
-    API->>API: 7. @PreAuthorize("@workspaceSecurity.hasRole(...)"): Check permissions
-    API->>DB: 8. Execute query against tenant schema
-    API-->>User: 9. 200 OK + JSON Response payload
+    API->>DB: 5. UserSyncFilter: Sync user profile into public.app_users
+    API->>DB: 6. TenantSecurityFilter: Verify User ID is active member in public.user_workspaces
+    API->>DB: 7. TenantConnectionProvider: Switch connection: SET search_path TO tenant_slug
+    API->>API: 8. @PreAuthorize("@workspaceSecurity.hasRole(...)"): Check permissions
+    API->>DB: 9. Execute query against tenant schema
+    API-->>User: 10. 200 OK + JSON Response payload
 ```
 
 ### Role-Based Access Control (RBAC) Matrix
@@ -399,7 +418,7 @@ sequenceDiagram
 | **Create & Update Tasks** | ✓ | ✓ | X | X |
 | **Update Task Status** | ✓ | ✓ | ✓ Assigned only | X |
 | **View Tasks** | ✓ All | ✓ All | ✓ Assigned | X |
-| **Start / Stop Timers & Log Time** | ✓ Assigned tasks | ✓ Assigned tasks | ✓ Assigned tasks | X |
+| **Start / Pause / Resume / Stop Timers & Log Time** | ✓ Assigned tasks | ✓ Assigned tasks | ✓ Assigned tasks | X |
 | **Generate & Delete Invoices** | ✓ | X | X | X |
 | **View & Download Invoice PDFs** | ✓ | ✓ | X | ✓ Own Company |
 
@@ -415,6 +434,8 @@ Agency OS uses **STOMP over WebSocket** with SockJS fallback at `/ws-timer`.
 |---|---|---|
 | `/topic/{tenantId}/time-entries` | Time entry manually created | `TimeEntryResponse` |
 | `/topic/{tenantId}/timers/start` | User starts a live stopwatch | `ActiveTimerResponse` |
+| `/topic/{tenantId}/timers/pause` | User pauses their stopwatch | `ActiveTimerResponse` |
+| `/topic/{tenantId}/timers/resume` | User resumes their stopwatch | `ActiveTimerResponse` |
 | `/topic/{tenantId}/timers/stop` | User stops their stopwatch | `TimeEntryResponse` |
 
 `WebSocketAuthChannelInterceptor` decodes Bearer JWTs on `CONNECT` and verifies workspace membership on `SUBSCRIBE` to prevent cross-tenant data leaks.
@@ -434,7 +455,7 @@ The `InvoicePdfGenerator` uses **Apache PDFBox 3.0.2** to create multi-page, bra
 ## Database Schema & Migrations
 
 - **Global Track (`db/migration/global`)**: Migrates `public` schema on application boot (`app_users`, `workspaces`, `user_workspaces`, `workspace_invitations`).
-- **Tenant Track (`db/migration/tenant`)**: Migrated dynamically on workspace creation via `TenantSchemaProvisioningService` (`clients`, `client_users`, `projects`, `tasks`, `time_entries`, `active_timers`, `invoices`).
+- **Tenant Track (`db/migration/tenant`)**: Migrated dynamically on workspace creation via `TenantSchemaProvisioningService` (`clients`, `client_users`, `projects`, `tasks`, `task_assignees`, `time_entries`, `active_timers`, `invoices`).
 
 ---
 
@@ -449,10 +470,11 @@ dev.eyadsharkawy.agency_os_api
 │   ├── multitenancy/                    # TenantResolver, TenantConnectionProvider, TenantSecurityFilter
 │   └── security/                        # SecurityConfig, WebSocketAuthChannelInterceptor, WorkspaceSecurity
 ├── global/
-│   ├── user/                            # AppUser entity & repository
+│   ├── user/                            # AppUser entity, repository, service, UserController
 │   └── workspace/                       # Workspace & Invitation entities, services, controllers
 ├── shared/
-│   └── entity/                          # BaseEntity (UUID PK, audit timestamps)
+│   ├── entity/                          # BaseEntity (UUID PK, audit timestamps)
+│   └── service/                         # WebSocketBroadcastService
 └── tenant/
     ├── client/                          # Client CRM entity, controller, service, repository
     ├── invoice/                         # Invoice entity, controller, service, PDFBox generator
@@ -503,7 +525,7 @@ KEYCLOAK_FRONTEND_CLIENT_ID=agency-os-frontend
 ## Testing & Quality Gates
 
 The backend includes 18 comprehensive test suites:
-- **Controller Tests (`@WebMvcTest`)**: `WorkspaceControllerTest`, `ClientControllerTest`, `ProjectControllerTest`, `TaskControllerTest`, `TimeEntryControllerTest`, `InvoiceControllerTest`, `WorkspaceInvitationControllerTest`.
+- **Controller Tests (`@WebMvcTest`)**: `UserControllerTest`, `WorkspaceControllerTest`, `ClientControllerTest`, `ProjectControllerTest`, `TaskControllerTest`, `TimeEntryControllerTest`, `InvoiceControllerTest`, `WorkspaceInvitationControllerTest`.
 - **Service Tests (Mockito + AssertJ)**: `WorkspaceServiceTest`, `ClientServiceTest`, `ProjectServiceTest`, `TaskServiceTest`, `TimeEntryServiceTest`, `InvoiceServiceTest`, `WorkspaceInvitationServiceTest`, `TenantSchemaProvisioningServiceTest`.
 - **Utility Tests**: `InvoicePdfGeneratorTest`, `WorkspaceProvisioningListenerTest`.
 - **Context Test**: `AgencyOsApiApplicationTests`.

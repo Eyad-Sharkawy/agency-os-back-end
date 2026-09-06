@@ -189,13 +189,16 @@ Logged time records against tasks.
 ---
 
 ### `active_timers`
-Real-time active stopwatches currently running.
+Real-time active stopwatches currently running or paused.
 
 | Column | Type | Constraints | Description |
 |---|---|---|---|
 | `user_id` | `VARCHAR(255)` | `PRIMARY KEY` | Keycloak User ID (Enforces 1 timer per user) |
 | `task_id` | `UUID` | `FK -> tasks(id) ON DELETE CASCADE` | Task being timed |
 | `start_time` | `TIMESTAMPTZ` | `NOT NULL` | UTC stopwatch start instant |
+| `is_paused` | `BOOLEAN` | `DEFAULT false` | Pause status flag |
+| `accumulated_seconds` | `INT` | `DEFAULT 0` | Accumulated seconds before pause |
+| `last_resume_timestamp` | `TIMESTAMPTZ` | `NULL` | Timestamp when stopwatch was last resumed |
 
 ---
 
@@ -342,6 +345,9 @@ erDiagram
         VARCHAR user_id PK "Keycloak sub (1 per user)"
         UUID task_id FK
         TIMESTAMPTZ start_time
+        BOOLEAN is_paused
+        INT accumulated_seconds
+        TIMESTAMPTZ last_resume_timestamp
     }
 
     Invoice {
