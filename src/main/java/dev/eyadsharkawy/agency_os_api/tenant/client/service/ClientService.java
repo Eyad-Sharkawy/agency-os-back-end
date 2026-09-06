@@ -55,15 +55,22 @@ public class ClientService {
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
-        log.info("Client user [{}] queried clients. Restricting to own client record.", keycloakId);
-        var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
-        if (clientIdOpt.isPresent()) {
-          return clientRepository.findById(clientIdOpt.get()).stream()
-              .map(ClientResponse::fromEntity)
-              .toList();
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.MEMBER) {
+          throw new AccessDeniedException(
+              "Access Denied: Members are not authorized to view client companies.");
+        } else if (role == WorkspaceRole.CLIENT) {
+          log.info(
+              "Client user [{}] queried clients. Restricting to own client record.", keycloakId);
+          var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+          if (clientIdOpt.isPresent()) {
+            return clientRepository.findById(clientIdOpt.get()).stream()
+                .map(ClientResponse::fromEntity)
+                .toList();
+          }
+          return List.of();
         }
-        return List.of();
       }
     }
 
@@ -80,10 +87,16 @@ public class ClientService {
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
-        var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
-        if (clientIdOpt.isEmpty() || !clientIdOpt.get().equals(id)) {
-          throw new AccessDeniedException("Access Denied: You cannot view other clients.");
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.MEMBER) {
+          throw new AccessDeniedException(
+              "Access Denied: Members are not authorized to view client companies.");
+        } else if (role == WorkspaceRole.CLIENT) {
+          var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+          if (clientIdOpt.isEmpty() || !clientIdOpt.get().equals(id)) {
+            throw new AccessDeniedException("Access Denied: You cannot view other clients.");
+          }
         }
       }
     }

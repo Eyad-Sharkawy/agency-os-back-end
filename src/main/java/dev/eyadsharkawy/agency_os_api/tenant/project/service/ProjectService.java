@@ -45,14 +45,9 @@ public class ProjectService {
               .orElseThrow(
                   () -> new AccessDeniedException("Access Denied: Requester is not a member."));
 
-      if (role == WorkspaceRole.CLIENT) {
+      if (role != WorkspaceRole.OWNER) {
         throw new AccessDeniedException(
-            "Access Denied: Clients are not allowed to create projects.");
-      }
-
-      if (role != WorkspaceRole.OWNER && request.clientId() != null) {
-        throw new AccessDeniedException(
-            "Only the workspace OWNER can assign a client to a project.");
+            "Access Denied: Only the workspace OWNER can create projects.");
       }
     }
 

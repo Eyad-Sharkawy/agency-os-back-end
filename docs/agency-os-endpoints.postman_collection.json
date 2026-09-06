@@ -467,7 +467,7 @@
                 "clients"
               ]
             },
-            "description": "Lists all client companies in the workspace. OWNER/ADMIN/MEMBER receive all, CLIENT receives own company."
+            "description": "Lists all client companies in the workspace. OWNER and ADMIN receive all, CLIENT receives own company only. MEMBER users receive 403 Forbidden."
           },
           "response": []
         },
@@ -499,7 +499,7 @@
                 }
               ]
             },
-            "description": "Retrieves client details by ID."
+            "description": "Retrieves client details by ID. Restricted to OWNER, ADMIN, or CLIENT (scoped to own company). MEMBER users receive 403 Forbidden."
           },
           "response": []
         },

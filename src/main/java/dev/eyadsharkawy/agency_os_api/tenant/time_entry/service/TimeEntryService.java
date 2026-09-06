@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class TimeEntryService {
   private static final String NO_ACTIVE_TIMER_MESSAGE = "No active timer found for this user";
+  private static final String ROLE_OWNER = "OWNER";
+  private static final String ROLE_ADMIN = "ADMIN";
 
   private final TimeEntryRepository timeEntryRepository;
   private final ActiveTimerRepository activeTimerRepository;
@@ -40,7 +42,7 @@ public class TimeEntryService {
     String targetUserId =
         (request.userId() != null && !request.userId().isBlank()) ? request.userId() : callerUserId;
 
-    if (!callerUserId.equals(targetUserId) && !workspaceSecurity.hasRole("OWNER", "ADMIN")) {
+    if (!callerUserId.equals(targetUserId) && !workspaceSecurity.hasRole(ROLE_OWNER, ROLE_ADMIN)) {
       throw new AccessDeniedException(
           "Access Denied: Only OWNER or ADMIN can log time on behalf of other team members.");
     }
@@ -189,24 +191,54 @@ public class TimeEntryService {
   }
 
   @Transactional(readOnly = true)
-  public List<TimeEntryResponse> getTimeEntries(UUID taskId, String userId) {
+  public List<TimeEntryResponse> getTimeEntries(Jwt jwt, UUID taskId, String userId) {
+    String callerUserId = jwt != null ? jwt.getSubject() : null;
+    boolean isPrivileged = workspaceSecurity.hasRole(ROLE_OWNER, ROLE_ADMIN);
+
+    String effectiveUserId = isPrivileged ? userId : callerUserId;
+
+    if (taskId != null && effectiveUserId != null && !effectiveUserId.isBlank()) {
+      return timeEntryRepository.findByTaskIdAndUserId(taskId, effectiveUserId).stream()
+          .map(TimeEntryResponse::fromEntity)
+          .toList();
+    }
     if (taskId != null) {
+      if (!isPrivileged && callerUserId != null) {
+        return timeEntryRepository.findByTaskIdAndUserId(taskId, callerUserId).stream()
+            .map(TimeEntryResponse::fromEntity)
+            .toList();
+      }
       return getTimeEntriesByTaskIdInternal(taskId);
     }
-    if (userId != null && !userId.isBlank()) {
-      return getTimeEntriesByUserIdInternal(userId);
+    if (effectiveUserId != null && !effectiveUserId.isBlank()) {
+      return getTimeEntriesByUserIdInternal(effectiveUserId);
     }
     log.info("Fetching all time entries for current tenant workspace");
     return timeEntryRepository.findAll().stream().map(TimeEntryResponse::fromEntity).toList();
   }
 
   @Transactional(readOnly = true)
-  public List<TimeEntryResponse> getTimeEntriesByTaskId(UUID taskId) {
+  public List<TimeEntryResponse> getTimeEntriesByTaskId(Jwt jwt, UUID taskId) {
+    String callerUserId = jwt != null ? jwt.getSubject() : null;
+    boolean isPrivileged = workspaceSecurity.hasRole(ROLE_OWNER, ROLE_ADMIN);
+
+    if (!isPrivileged && callerUserId != null) {
+      return timeEntryRepository.findByTaskIdAndUserId(taskId, callerUserId).stream()
+          .map(TimeEntryResponse::fromEntity)
+          .toList();
+    }
     return getTimeEntriesByTaskIdInternal(taskId);
   }
 
   @Transactional(readOnly = true)
-  public List<TimeEntryResponse> getTimeEntriesByUserId(String userId) {
+  public List<TimeEntryResponse> getTimeEntriesByUserId(Jwt jwt, String userId) {
+    String callerUserId = jwt != null ? jwt.getSubject() : null;
+    boolean isPrivileged = workspaceSecurity.hasRole(ROLE_OWNER, ROLE_ADMIN);
+
+    if (!isPrivileged && callerUserId != null && !callerUserId.equals(userId)) {
+      throw new AccessDeniedException(
+          "Access Denied: Members can only view their own time entries.");
+    }
     return getTimeEntriesByUserIdInternal(userId);
   }
 
@@ -225,13 +257,21 @@ public class TimeEntryService {
   }
 
   @Transactional
-  public void deleteTimeEntry(UUID id) {
+  public void deleteTimeEntry(Jwt jwt, UUID id) {
     log.info("Deleting time entry: {}", id);
     TimeEntry entry =
         timeEntryRepository
             .findById(id)
             .orElseThrow(
                 () -> new ResourceNotFoundException("Time entry not found with id: " + id));
+
+    String callerUserId = jwt != null ? jwt.getSubject() : null;
+    boolean isPrivileged = workspaceSecurity.hasRole(ROLE_OWNER, ROLE_ADMIN);
+    if (!isPrivileged && (callerUserId == null || !callerUserId.equals(entry.getUserId()))) {
+      throw new AccessDeniedException(
+          "Access Denied: You cannot delete another user's time entry.");
+    }
+
     timeEntryRepository.delete(entry);
   }
 
@@ -242,7 +282,7 @@ public class TimeEntryService {
   }
 
   private void validateUserIsAssignedToTask(String callerUserId, String targetUserId, Task task) {
-    if (callerUserId.equals(targetUserId) && workspaceSecurity.hasRole("OWNER", "ADMIN")) {
+    if (callerUserId.equals(targetUserId) && workspaceSecurity.hasRole(ROLE_OWNER, ROLE_ADMIN)) {
       return;
     }
     if (task.getAssigneeIds() == null || !task.getAssigneeIds().contains(targetUserId)) {

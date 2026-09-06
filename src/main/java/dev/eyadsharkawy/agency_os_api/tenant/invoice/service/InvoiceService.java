@@ -5,9 +5,9 @@ import dev.eyadsharkawy.agency_os_api.core.multitenancy.TenantContextHolder;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
+import dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService;
 import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
 import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.dto.InvoiceRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.dto.InvoiceResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.entity.Invoice;
@@ -36,7 +36,7 @@ public class InvoiceService {
   private final ClientRepository clientRepository;
   private final WorkspaceRepository workspaceRepository;
   private final TimeEntryRepository timeEntryRepository;
-  private final ClientUserRepository clientUserRepository;
+  private final ClientUserRegistrationService clientUserRegistrationService;
   private final UserWorkspaceRepository userWorkspaceRepository;
 
   @Transactional
@@ -89,19 +89,25 @@ public class InvoiceService {
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
-        var clientUserOpt = clientUserRepository.findById(keycloakId);
-        if (clientUserOpt.isPresent()) {
-          UUID clientId = clientUserOpt.get().getClient().getId();
-          log.info(
-              "Client portal user [{}] queried invoices. Filtering for client [{}]",
-              keycloakId,
-              clientId);
-          return invoiceRepository.findByClientId(clientId).stream()
-              .map(InvoiceResponse::fromEntity)
-              .toList();
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.CLIENT) {
+          var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+          if (clientIdOpt.isPresent()) {
+            UUID clientId = clientIdOpt.get();
+            log.info(
+                "Client portal user [{}] queried invoices. Filtering for client [{}]",
+                keycloakId,
+                clientId);
+            return invoiceRepository.findByClientId(clientId).stream()
+                .map(InvoiceResponse::fromEntity)
+                .toList();
+          }
+          return List.of();
+        } else if (role == WorkspaceRole.MEMBER) {
+          throw new AccessDeniedException(
+              "Access Denied: Members are not authorized to view invoices.");
         }
-        return List.of();
       }
     }
 
@@ -188,12 +194,17 @@ public class InvoiceService {
       String tenantId = TenantContextHolder.getTenantId();
 
       var roleOpt = userWorkspaceRepository.findRoleByKeycloakIdAndTenantId(keycloakId, tenantId);
-      if (roleOpt.isPresent() && roleOpt.get() == WorkspaceRole.CLIENT) {
-        var clientUserOpt = clientUserRepository.findById(keycloakId);
-        if (clientUserOpt.isEmpty()
-            || !clientUserOpt.get().getClient().getId().equals(invoice.getClient().getId())) {
+      if (roleOpt.isPresent()) {
+        WorkspaceRole role = roleOpt.get();
+        if (role == WorkspaceRole.MEMBER) {
           throw new AccessDeniedException(
-              "Access Denied: You are not authorized to view this invoice.");
+              "Access Denied: Members are not authorized to view invoices.");
+        } else if (role == WorkspaceRole.CLIENT) {
+          var clientIdOpt = clientUserRegistrationService.resolveClientId(keycloakId, tenantId);
+          if (clientIdOpt.isEmpty() || !clientIdOpt.get().equals(invoice.getClient().getId())) {
+            throw new AccessDeniedException(
+                "Access Denied: You are not authorized to view this invoice.");
+          }
         }
       }
     }

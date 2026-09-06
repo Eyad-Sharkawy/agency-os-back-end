@@ -10,10 +10,9 @@ import dev.eyadsharkawy.agency_os_api.global.workspace.entity.Workspace;
 import dev.eyadsharkawy.agency_os_api.global.workspace.entity.WorkspaceRole;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.UserWorkspaceRepository;
 import dev.eyadsharkawy.agency_os_api.global.workspace.repository.WorkspaceRepository;
+import dev.eyadsharkawy.agency_os_api.global.workspace.service.ClientUserRegistrationService;
 import dev.eyadsharkawy.agency_os_api.tenant.client.entity.Client;
-import dev.eyadsharkawy.agency_os_api.tenant.client.entity.ClientUser;
 import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientRepository;
-import dev.eyadsharkawy.agency_os_api.tenant.client.repository.ClientUserRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.dto.InvoiceRequest;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.dto.InvoiceResponse;
 import dev.eyadsharkawy.agency_os_api.tenant.invoice.entity.Invoice;
@@ -49,7 +48,7 @@ class InvoiceServiceTest {
   @Mock private ClientRepository clientRepository;
   @Mock private WorkspaceRepository workspaceRepository;
   @Mock private TimeEntryRepository timeEntryRepository;
-  @Mock private ClientUserRepository clientUserRepository;
+  @Mock private ClientUserRegistrationService clientUserRegistrationService;
   @Mock private UserWorkspaceRepository userWorkspaceRepository;
 
   @InjectMocks private InvoiceService invoiceService;
@@ -164,11 +163,8 @@ class InvoiceServiceTest {
   void getAllInvoices_ClientRole_Filtered() {
     mockSecurityContext(WorkspaceRole.CLIENT);
 
-    ClientUser clientUser = new ClientUser();
-    clientUser.setUserId("kc-user-123");
-    clientUser.setClient(client);
-
-    when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.of(clientUser));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(clientId));
     when(invoiceRepository.findByClientId(clientId)).thenReturn(List.of(invoice));
 
     List<InvoiceResponse> responses = invoiceService.getAllInvoices();
@@ -178,22 +174,40 @@ class InvoiceServiceTest {
   }
 
   @Test
+  @DisplayName("getAllInvoices for MEMBER role should throw AccessDeniedException")
+  void getAllInvoices_MemberRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+
+    assertThatThrownBy(() -> invoiceService.getAllInvoices())
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Members are not authorized to view invoices");
+  }
+
+  @Test
   @DisplayName(
       "getInvoiceById for CLIENT role should throw AccessDeniedException if client mismatch")
   void getInvoiceById_ClientMismatch_AccessDenied() {
     mockSecurityContext(WorkspaceRole.CLIENT);
 
-    Client otherClient = new Client();
-    otherClient.setId(UUID.randomUUID());
-    ClientUser clientUser = new ClientUser();
-    clientUser.setClient(otherClient);
-
     when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
-    when(clientUserRepository.findById("kc-user-123")).thenReturn(Optional.of(clientUser));
+    when(clientUserRegistrationService.resolveClientId("kc-user-123", "tenant_acme"))
+        .thenReturn(Optional.of(UUID.randomUUID()));
 
     assertThatThrownBy(() -> invoiceService.getInvoiceById(invoiceId))
         .isInstanceOf(AccessDeniedException.class)
         .hasMessageContaining("not authorized to view this invoice");
+  }
+
+  @Test
+  @DisplayName("getInvoiceById for MEMBER role should throw AccessDeniedException")
+  void getInvoiceById_MemberRole_AccessDenied() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+
+    when(invoiceRepository.findById(invoiceId)).thenReturn(Optional.of(invoice));
+
+    assertThatThrownBy(() -> invoiceService.getInvoiceById(invoiceId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("Members are not authorized to view invoices");
   }
 
   @Test

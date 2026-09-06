@@ -300,15 +300,15 @@ Creates a new client company.
 ---
 
 ### `GET /api/v1/clients`
-Lists all client companies in the workspace. `CLIENT` users only see their own company.  
-**Permissions**: `OWNER`, `ADMIN`, `MEMBER`, `CLIENT`  
+Lists all client companies in the workspace. `CLIENT` users only see their own company; `MEMBER` users receive `403 Forbidden`.  
+**Permissions**: `OWNER`, `ADMIN`, `CLIENT`  
 **Headers**: `X-Tenant-ID: <tenantId>`
 
 ---
 
 ### `GET /api/v1/clients/{id}`
-Retrieves client details by ID.  
-**Permissions**: `OWNER`, `ADMIN`, `MEMBER`, `CLIENT`  
+Retrieves client details by ID. `CLIENT` users can only view their linked company; `MEMBER` users receive `403 Forbidden`.  
+**Permissions**: `OWNER`, `ADMIN`, `CLIENT`  
 **Headers**: `X-Tenant-ID: <tenantId>`
 
 ---

@@ -90,7 +90,7 @@ class TimeEntryControllerTest {
   @Test
   void testGetTimeEntries_Success() throws Exception {
     when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
-    when(timeEntryService.getTimeEntries(any(), any())).thenReturn(List.of());
+    when(timeEntryService.getTimeEntries(any(), any(), any())).thenReturn(List.of());
 
     mockMvc
         .perform(
@@ -164,7 +164,7 @@ class TimeEntryControllerTest {
             Instant.now().plusSeconds(3600));
 
     when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
-    when(timeEntryService.stopTimer(any(), eq(true))).thenReturn(response);
+    when(timeEntryService.stopTimer(any(), eq(true), any())).thenReturn(response);
 
     mockMvc
         .perform(
@@ -197,7 +197,7 @@ class TimeEntryControllerTest {
     UUID taskId = UUID.randomUUID();
 
     when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
-    when(timeEntryService.getTimeEntriesByTaskId(taskId)).thenReturn(List.of());
+    when(timeEntryService.getTimeEntriesByTaskId(any(), eq(taskId))).thenReturn(List.of());
 
     mockMvc
         .perform(
@@ -212,7 +212,7 @@ class TimeEntryControllerTest {
     String userId = "userId";
 
     when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
-    when(timeEntryService.getTimeEntriesByUserId(userId)).thenReturn(List.of());
+    when(timeEntryService.getTimeEntriesByUserId(any(), eq(userId))).thenReturn(List.of());
 
     mockMvc
         .perform(

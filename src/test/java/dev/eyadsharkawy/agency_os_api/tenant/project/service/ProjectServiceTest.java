@@ -98,9 +98,9 @@ class ProjectServiceTest {
   }
 
   @Test
-  @DisplayName("createProject should throw AccessDeniedException if non-OWNER assigns client")
+  @DisplayName("createProject should throw AccessDeniedException if non-OWNER creates project")
   void createProject_NonOwner_AccessDenied() {
-    mockSecurityContext(WorkspaceRole.MEMBER);
+    mockSecurityContext(WorkspaceRole.ADMIN);
     ProjectRequest request =
         new ProjectRequest(
             "Redesign",
@@ -112,7 +112,7 @@ class ProjectServiceTest {
 
     assertThatThrownBy(() -> projectService.createProject(request))
         .isInstanceOf(AccessDeniedException.class)
-        .hasMessageContaining("Only the workspace OWNER can assign a client");
+        .hasMessageContaining("Only the workspace OWNER can create projects");
   }
 
   @Test
@@ -421,7 +421,7 @@ class ProjectServiceTest {
 
     assertThatThrownBy(() -> projectService.createProject(request))
         .isInstanceOf(AccessDeniedException.class)
-        .hasMessageContaining("Clients are not allowed to create projects");
+        .hasMessageContaining("Only the workspace OWNER can create projects");
   }
 
   @Test
