@@ -121,6 +121,16 @@ class ClientServiceTest {
   }
 
   @Test
+  @DisplayName("getAllClients for MEMBER role should throw AccessDeniedException")
+  void getAllClients_MemberRole_ThrowsAccessDenied() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+
+    assertThatThrownBy(() -> clientService.getAllClients())
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+        .hasMessageContaining("Members are not authorized to view client companies");
+  }
+
+  @Test
   @DisplayName("getAllClients for CLIENT role should return empty list when no client resolved")
   void getAllClients_ClientRole_NoClient_ReturnsEmpty() {
     mockSecurityContext(WorkspaceRole.CLIENT);
@@ -181,6 +191,16 @@ class ClientServiceTest {
     assertThatThrownBy(() -> clientService.getClientById(clientId))
         .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
         .hasMessageContaining("You cannot view other clients");
+  }
+
+  @Test
+  @DisplayName("getClientById for MEMBER role should throw AccessDeniedException")
+  void getClientById_MemberRole_ThrowsAccessDenied() {
+    mockSecurityContext(WorkspaceRole.MEMBER);
+
+    assertThatThrownBy(() -> clientService.getClientById(clientId))
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+        .hasMessageContaining("Members are not authorized to view client companies");
   }
 
   @Test

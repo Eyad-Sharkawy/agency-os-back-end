@@ -28,11 +28,11 @@ public class ProjectController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  @PreAuthorize("@workspaceSecurity.hasRole('OWNER', 'ADMIN')")
+  @PreAuthorize("@workspaceSecurity.hasRole('OWNER')")
   @Operation(
       summary = "Create project",
       description =
-          "Initializes a new project under the current tenant. Only the OWNER can assign a client company during creation; Admins cannot.")
+          "Initializes a new project under the current tenant. Restricted strictly to the OWNER.")
   public ResponseEntity<ProjectResponse> createProject(@Valid @RequestBody ProjectRequest request) {
     ProjectResponse response = projectService.createProject(request);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);

@@ -282,17 +282,35 @@ class TimeEntryServiceTest {
   }
 
   @Test
-  @DisplayName("deleteTimeEntry should delete entry when found")
-  void deleteTimeEntry_Success() {
+  @DisplayName("deleteTimeEntry should delete entry when caller is owner of entry")
+  void deleteTimeEntry_OwnEntry_Success() {
     UUID entryId = UUID.randomUUID();
     TimeEntry entry = new TimeEntry();
     entry.setId(entryId);
+    entry.setUserId("kc-user-123");
 
     when(timeEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
 
-    timeEntryService.deleteTimeEntry(entryId);
+    timeEntryService.deleteTimeEntry(jwt, entryId);
 
     verify(timeEntryRepository, times(1)).delete(entry);
+  }
+
+  @Test
+  @DisplayName(
+      "deleteTimeEntry should throw AccessDeniedException when member tries to delete another user's entry")
+  void deleteTimeEntry_OtherUserEntry_ThrowsAccessDenied() {
+    UUID entryId = UUID.randomUUID();
+    TimeEntry entry = new TimeEntry();
+    entry.setId(entryId);
+    entry.setUserId("kc-other-456");
+
+    when(timeEntryRepository.findById(entryId)).thenReturn(Optional.of(entry));
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(false);
+
+    assertThatThrownBy(() -> timeEntryService.deleteTimeEntry(jwt, entryId))
+        .isInstanceOf(AccessDeniedException.class)
+        .hasMessageContaining("You cannot delete another user's time entry");
   }
 
   @Test
@@ -301,7 +319,7 @@ class TimeEntryServiceTest {
     UUID entryId = UUID.randomUUID();
     when(timeEntryRepository.findById(entryId)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> timeEntryService.deleteTimeEntry(entryId))
+    assertThatThrownBy(() -> timeEntryService.deleteTimeEntry(jwt, entryId))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
@@ -361,8 +379,8 @@ class TimeEntryServiceTest {
   }
 
   @Test
-  @DisplayName("getTimeEntries should return all entries when no filters passed")
-  void getTimeEntries_NoFilters_ReturnsAll() {
+  @DisplayName("getTimeEntries for OWNER or ADMIN should return all entries when no filters passed")
+  void getTimeEntries_OwnerAdmin_NoFilters_ReturnsAll() {
     TimeEntry entry = new TimeEntry();
     entry.setId(UUID.randomUUID());
     entry.setTask(task);
@@ -370,12 +388,32 @@ class TimeEntryServiceTest {
     entry.setDurationMinutes(45);
     entry.setBillable(true);
 
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(true);
     when(timeEntryRepository.findAll()).thenReturn(List.of(entry));
 
-    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(null, null);
+    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(jwt, null, null);
 
     assertThat(entries).hasSize(1);
     assertThat(entries.get(0).durationMinutes()).isEqualTo(45);
+  }
+
+  @Test
+  @DisplayName("getTimeEntries for MEMBER should return only their own entries")
+  void getTimeEntries_Member_ReturnsOwnEntriesOnly() {
+    TimeEntry entry = new TimeEntry();
+    entry.setId(UUID.randomUUID());
+    entry.setTask(task);
+    entry.setUserId("kc-user-123");
+    entry.setDurationMinutes(45);
+    entry.setBillable(true);
+
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(false);
+    when(timeEntryRepository.findByUserId("kc-user-123")).thenReturn(List.of(entry));
+
+    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(jwt, null, null);
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.get(0).userId()).isEqualTo("kc-user-123");
   }
 
   @Test
@@ -387,9 +425,10 @@ class TimeEntryServiceTest {
     entry.setUserId("kc-user-123");
     entry.setDurationMinutes(30);
 
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(true);
     when(timeEntryRepository.findByTaskId(taskId)).thenReturn(List.of(entry));
 
-    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(taskId, null);
+    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(jwt, taskId, null);
 
     assertThat(entries).hasSize(1);
     assertThat(entries.get(0).durationMinutes()).isEqualTo(30);
@@ -404,9 +443,10 @@ class TimeEntryServiceTest {
     entry.setUserId("kc-user-123");
     entry.setDurationMinutes(60);
 
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(true);
     when(timeEntryRepository.findByUserId("kc-user-123")).thenReturn(List.of(entry));
 
-    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(null, "kc-user-123");
+    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(jwt, null, "kc-user-123");
 
     assertThat(entries).hasSize(1);
     assertThat(entries.get(0).durationMinutes()).isEqualTo(60);

@@ -12,6 +12,10 @@ public record WorkspaceMemberResponse(
             description = "Unique identifier of the user",
             example = "123e4567-e89b-12d3-a456-426614174000")
         UUID userId,
+    @Schema(
+            description = "Keycloak subject UUID of the user",
+            example = "fc8c99b7-3f29-43f3-917a-3f24f0da41c4")
+        String keycloakId,
     @Schema(description = "Username of the member", example = "john_doe") String username,
     @Schema(description = "Email address of the member", example = "john@example.com") String email,
     @Schema(description = "First name of the member", example = "John") String firstName,
@@ -20,6 +24,7 @@ public record WorkspaceMemberResponse(
   public static WorkspaceMemberResponse fromEntity(UserWorkspace userWorkspace) {
     return new WorkspaceMemberResponse(
         userWorkspace.getUser().getId(),
+        userWorkspace.getUser().getKeycloakId(),
         userWorkspace.getUser().getUsername(),
         userWorkspace.getUser().getEmail(),
         userWorkspace.getUser().getFirstName(),

@@ -61,11 +61,12 @@ public class TimeEntryController {
       description =
           "Retrieves the list of all logged time entries in the current workspace, optionally filtered by task or user ID.")
   public ResponseEntity<List<TimeEntryResponse>> getTimeEntries(
+      @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "Optional filter by task ID") @RequestParam(required = false)
           UUID taskId,
       @Parameter(description = "Optional filter by user ID") @RequestParam(required = false)
           String userId) {
-    List<TimeEntryResponse> responses = timeEntryService.getTimeEntries(taskId, userId);
+    List<TimeEntryResponse> responses = timeEntryService.getTimeEntries(jwt, taskId, userId);
     return ResponseEntity.ok(responses);
   }
 
@@ -153,8 +154,9 @@ public class TimeEntryController {
       description =
           "Retrieves the list of all logged time entries associated with a specific task.")
   public ResponseEntity<List<TimeEntryResponse>> getTimeEntriesByTaskId(
+      @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "The task ID") @PathVariable UUID taskId) {
-    List<TimeEntryResponse> responses = timeEntryService.getTimeEntriesByTaskId(taskId);
+    List<TimeEntryResponse> responses = timeEntryService.getTimeEntriesByTaskId(jwt, taskId);
     return ResponseEntity.ok(responses);
   }
 
@@ -164,8 +166,9 @@ public class TimeEntryController {
       description =
           "Retrieves the list of all logged time entries submitted by a specific user ID.")
   public ResponseEntity<List<TimeEntryResponse>> getTimeEntriesByUserId(
+      @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "The target user's Keycloak ID") @PathVariable String userId) {
-    List<TimeEntryResponse> responses = timeEntryService.getTimeEntriesByUserId(userId);
+    List<TimeEntryResponse> responses = timeEntryService.getTimeEntriesByUserId(jwt, userId);
     return ResponseEntity.ok(responses);
   }
 
@@ -175,8 +178,9 @@ public class TimeEntryController {
       summary = "Delete time entry",
       description = "Deletes a logged time entry from the timesheet history.")
   public ResponseEntity<Void> deleteTimeEntry(
+      @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "The time entry unique ID") @PathVariable UUID id) {
-    timeEntryService.deleteTimeEntry(id);
+    timeEntryService.deleteTimeEntry(jwt, id);
     return ResponseEntity.noContent().build();
   }
 }

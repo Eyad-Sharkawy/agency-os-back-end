@@ -312,8 +312,8 @@ erDiagram
 | Method | Path | Required Role | Description |
 |---|---|---|---|
 | `POST` | `/api/v1/clients` | `OWNER`, `ADMIN` | Create a new client company profile |
-| `GET` | `/api/v1/clients` | `OWNER`, `ADMIN`, `MEMBER`, `CLIENT` | List all client profiles (`CLIENT` scoped to own company) |
-| `GET` | `/api/v1/clients/{id}` | `OWNER`, `ADMIN`, `MEMBER`, `CLIENT` | Get client details by UUID |
+| `GET` | `/api/v1/clients` | `OWNER`, `ADMIN`, `CLIENT` | List all client profiles (`CLIENT` scoped to own company; `MEMBER` blocked with 403) |
+| `GET` | `/api/v1/clients/{id}` | `OWNER`, `ADMIN`, `CLIENT` | Get client details by UUID (`CLIENT` scoped to own company; `MEMBER` blocked with 403) |
 | `PUT` | `/api/v1/clients/{id}` | `OWNER` | Update client name, email, or lifecycle status |
 | `DELETE` | `/api/v1/clients/{id}` | `OWNER` | Soft-delete client and cascade soft-deletion to projects |
 
@@ -413,6 +413,7 @@ sequenceDiagram
 | **Manage Members & Roles** | ✓ | ✓ | X | X |
 | **Send Workspace Invitations** | ✓ | ✓ | X | X |
 | **Create & Update Clients** | ✓ | ✓ (Create) | X | X |
+| **View Clients** | ✓ All | ✓ All | X | ✓ Own Company |
 | **Create & Update Projects** | ✓ | ✓ | X | X |
 | **View Projects** | ✓ All | ✓ All | ✓ Assigned | ✓ Own Company |
 | **Create & Update Tasks** | ✓ | ✓ | X | X |
