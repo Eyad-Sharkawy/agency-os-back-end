@@ -43,6 +43,10 @@ public class OpenApiConfig {
         .tags(
             List.of(
                 new Tag()
+                    .name("00. Users")
+                    .description(
+                        "Endpoints for user profile synchronization and account discovery"),
+                new Tag()
                     .name("01. Workspaces")
                     .description(
                         "Endpoints for managing workspace organizations, membership listings, roles, and ownership transfers"),
