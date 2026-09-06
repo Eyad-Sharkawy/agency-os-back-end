@@ -21,4 +21,13 @@ public class ActiveTimer {
 
   @Column(name = "start_time", nullable = false)
   private Instant startTime = Instant.now();
+
+  @Column(name = "is_paused", nullable = false)
+  private boolean isPaused = false;
+
+  @Column(name = "accumulated_seconds", nullable = false)
+  private int accumulatedSeconds = 0;
+
+  @Column(name = "last_resume_timestamp")
+  private Instant lastResumeTimestamp;
 }

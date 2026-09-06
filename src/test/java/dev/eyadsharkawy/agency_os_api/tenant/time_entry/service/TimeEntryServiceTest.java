@@ -17,6 +17,7 @@ import dev.eyadsharkawy.agency_os_api.tenant.time_entry.entity.TimeEntry;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.repository.ActiveTimerRepository;
 import dev.eyadsharkawy.agency_os_api.tenant.time_entry.repository.TimeEntryRepository;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -187,6 +188,23 @@ class TimeEntryServiceTest {
   }
 
   @Test
+  @DisplayName("startTimer should allow OWNER or ADMIN even if unassigned to task")
+  void startTimer_OwnerOrAdmin_Unassigned_Success() {
+    task.setAssigneeIds(Set.of("other-user"));
+
+    when(workspaceSecurity.hasRole("OWNER", "ADMIN")).thenReturn(true);
+    when(activeTimerRepository.existsById("kc-user-123")).thenReturn(false);
+    when(taskRepository.findById(taskId)).thenReturn(Optional.of(task));
+    when(activeTimerRepository.save(any(ActiveTimer.class))).thenAnswer(i -> i.getArgument(0));
+
+    ActiveTimerResponse response = timeEntryService.startTimer(jwt, taskId);
+
+    assertThat(response).isNotNull();
+    assertThat(response.taskId()).isEqualTo(taskId);
+    verify(activeTimerRepository, times(1)).save(any(ActiveTimer.class));
+  }
+
+  @Test
   @DisplayName("stopTimer should throw ResourceNotFoundException if no active timer")
   void stopTimer_NoActiveTimer_ThrowsException() {
     when(activeTimerRepository.findById("kc-user-123")).thenReturn(Optional.empty());
@@ -217,6 +235,32 @@ class TimeEntryServiceTest {
 
     assertThat(response).isNotNull();
     assertThat(response.durationMinutes()).isGreaterThanOrEqualTo(2);
+    verify(timeEntryRepository, times(1)).save(any(TimeEntry.class));
+    verify(activeTimerRepository, times(1)).delete(activeTimer);
+  }
+
+  @Test
+  @DisplayName("stopTimer should use custom durationMinutes if provided")
+  void stopTimer_WithCustomDuration_Success() {
+    ActiveTimer activeTimer = new ActiveTimer();
+    activeTimer.setUserId("kc-user-123");
+    activeTimer.setTask(task);
+    activeTimer.setStartTime(Instant.now().minusSeconds(3600)); // 60 mins ago in real time
+
+    when(activeTimerRepository.findById("kc-user-123")).thenReturn(Optional.of(activeTimer));
+    when(timeEntryRepository.save(any(TimeEntry.class)))
+        .thenAnswer(
+            i -> {
+              TimeEntry te = i.getArgument(0);
+              te.setId(UUID.randomUUID());
+              return te;
+            });
+
+    // But user was paused for 45 mins, so customDurationMinutes is 15
+    TimeEntryResponse response = timeEntryService.stopTimer(jwt, true, 15);
+
+    assertThat(response).isNotNull();
+    assertThat(response.durationMinutes()).isEqualTo(15);
     verify(timeEntryRepository, times(1)).save(any(TimeEntry.class));
     verify(activeTimerRepository, times(1)).delete(activeTimer);
   }
@@ -271,5 +315,100 @@ class TimeEntryServiceTest {
 
     assertThat(timerOpt).isEmpty();
     verifyNoInteractions(activeTimerRepository);
+  }
+
+  @Test
+  @DisplayName("pauseTimer should pause running timer and accumulate seconds")
+  void pauseTimer_Success() {
+    ActiveTimer activeTimer = new ActiveTimer();
+    activeTimer.setUserId("kc-user-123");
+    activeTimer.setTask(task);
+    activeTimer.setStartTime(Instant.now().minusSeconds(120));
+    activeTimer.setPaused(false);
+    activeTimer.setAccumulatedSeconds(0);
+    activeTimer.setLastResumeTimestamp(Instant.now().minusSeconds(120));
+
+    when(activeTimerRepository.findById("kc-user-123")).thenReturn(Optional.of(activeTimer));
+    when(activeTimerRepository.save(any(ActiveTimer.class))).thenAnswer(i -> i.getArgument(0));
+
+    ActiveTimerResponse response = timeEntryService.pauseTimer(jwt);
+
+    assertThat(response.isPaused()).isTrue();
+    assertThat(response.accumulatedSeconds()).isGreaterThanOrEqualTo(120);
+    verify(activeTimerRepository, times(1)).save(activeTimer);
+  }
+
+  @Test
+  @DisplayName("resumeTimer should unpause timer and update lastResumeTimestamp")
+  void resumeTimer_Success() {
+    ActiveTimer activeTimer = new ActiveTimer();
+    activeTimer.setUserId("kc-user-123");
+    activeTimer.setTask(task);
+    activeTimer.setStartTime(Instant.now().minusSeconds(300));
+    activeTimer.setPaused(true);
+    activeTimer.setAccumulatedSeconds(120);
+    activeTimer.setLastResumeTimestamp(null);
+
+    when(activeTimerRepository.findById("kc-user-123")).thenReturn(Optional.of(activeTimer));
+    when(activeTimerRepository.save(any(ActiveTimer.class))).thenAnswer(i -> i.getArgument(0));
+
+    ActiveTimerResponse response = timeEntryService.resumeTimer(jwt);
+
+    assertThat(response.isPaused()).isFalse();
+    assertThat(response.accumulatedSeconds()).isEqualTo(120);
+    assertThat(response.lastResumeTimestamp()).isNotNull();
+    verify(activeTimerRepository, times(1)).save(activeTimer);
+  }
+
+  @Test
+  @DisplayName("getTimeEntries should return all entries when no filters passed")
+  void getTimeEntries_NoFilters_ReturnsAll() {
+    TimeEntry entry = new TimeEntry();
+    entry.setId(UUID.randomUUID());
+    entry.setTask(task);
+    entry.setUserId("kc-user-123");
+    entry.setDurationMinutes(45);
+    entry.setBillable(true);
+
+    when(timeEntryRepository.findAll()).thenReturn(List.of(entry));
+
+    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(null, null);
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.get(0).durationMinutes()).isEqualTo(45);
+  }
+
+  @Test
+  @DisplayName("getTimeEntries should return entries filtered by taskId when taskId provided")
+  void getTimeEntries_WithTaskId_ReturnsFiltered() {
+    TimeEntry entry = new TimeEntry();
+    entry.setId(UUID.randomUUID());
+    entry.setTask(task);
+    entry.setUserId("kc-user-123");
+    entry.setDurationMinutes(30);
+
+    when(timeEntryRepository.findByTaskId(taskId)).thenReturn(List.of(entry));
+
+    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(taskId, null);
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.get(0).durationMinutes()).isEqualTo(30);
+  }
+
+  @Test
+  @DisplayName("getTimeEntries should return entries filtered by userId when userId provided")
+  void getTimeEntries_WithUserId_ReturnsFiltered() {
+    TimeEntry entry = new TimeEntry();
+    entry.setId(UUID.randomUUID());
+    entry.setTask(task);
+    entry.setUserId("kc-user-123");
+    entry.setDurationMinutes(60);
+
+    when(timeEntryRepository.findByUserId("kc-user-123")).thenReturn(List.of(entry));
+
+    List<TimeEntryResponse> entries = timeEntryService.getTimeEntries(null, "kc-user-123");
+
+    assertThat(entries).hasSize(1);
+    assertThat(entries.get(0).durationMinutes()).isEqualTo(60);
   }
 }

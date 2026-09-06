@@ -15,9 +15,20 @@ public record ActiveTimerResponse(
             example = "123e4567-e89b-12d3-a456-426614174000")
         UUID taskId,
     @Schema(description = "Timestamp when the timer was started", example = "2026-02-01T10:00:00Z")
-        Instant startTime) {
+        Instant startTime,
+    @Schema(description = "Whether the timer is currently paused", example = "false")
+        boolean isPaused,
+    @Schema(description = "Accumulated elapsed seconds while active", example = "120")
+        int accumulatedSeconds,
+    @Schema(description = "Timestamp when timer was last resumed", example = "2026-02-01T10:05:00Z")
+        Instant lastResumeTimestamp) {
   public static ActiveTimerResponse fromEntity(ActiveTimer timer) {
     return new ActiveTimerResponse(
-        timer.getUserId(), timer.getTask().getId(), timer.getStartTime());
+        timer.getUserId(),
+        timer.getTask().getId(),
+        timer.getStartTime(),
+        timer.isPaused(),
+        timer.getAccumulatedSeconds(),
+        timer.getLastResumeTimestamp());
   }
 }
