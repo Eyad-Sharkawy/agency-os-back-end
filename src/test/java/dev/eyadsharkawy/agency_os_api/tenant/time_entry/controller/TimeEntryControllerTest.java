@@ -88,9 +88,23 @@ class TimeEntryControllerTest {
   }
 
   @Test
+  void testGetTimeEntries_Success() throws Exception {
+    when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
+    when(timeEntryService.getTimeEntries(any(), any())).thenReturn(List.of());
+
+    mockMvc
+        .perform(
+            get("/api/v1/time-entries")
+                .header("X-Tenant-ID", "tenant1")
+                .with(SecurityMockMvcRequestPostProcessors.jwt()))
+        .andExpect(status().isOk());
+  }
+
+  @Test
   void testStartTimer_Success() throws Exception {
     UUID taskId = UUID.randomUUID();
-    ActiveTimerResponse response = new ActiveTimerResponse("userId", taskId, Instant.now());
+    ActiveTimerResponse response =
+        new ActiveTimerResponse("userId", taskId, Instant.now(), false, 0, Instant.now());
 
     when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
     when(timeEntryService.startTimer(any(), eq(taskId))).thenReturn(response);
@@ -101,6 +115,40 @@ class TimeEntryControllerTest {
                 .header("X-Tenant-ID", "tenant1")
                 .with(SecurityMockMvcRequestPostProcessors.jwt()))
         .andExpect(status().isCreated());
+  }
+
+  @Test
+  void testPauseTimer_Success() throws Exception {
+    UUID taskId = UUID.randomUUID();
+    ActiveTimerResponse response =
+        new ActiveTimerResponse("userId", taskId, Instant.now(), true, 60, null);
+
+    when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
+    when(timeEntryService.pauseTimer(any())).thenReturn(response);
+
+    mockMvc
+        .perform(
+            post("/api/v1/time-entries/pause")
+                .header("X-Tenant-ID", "tenant1")
+                .with(SecurityMockMvcRequestPostProcessors.jwt()))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void testResumeTimer_Success() throws Exception {
+    UUID taskId = UUID.randomUUID();
+    ActiveTimerResponse response =
+        new ActiveTimerResponse("userId", taskId, Instant.now(), false, 60, Instant.now());
+
+    when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
+    when(timeEntryService.resumeTimer(any())).thenReturn(response);
+
+    mockMvc
+        .perform(
+            post("/api/v1/time-entries/resume")
+                .header("X-Tenant-ID", "tenant1")
+                .with(SecurityMockMvcRequestPostProcessors.jwt()))
+        .andExpect(status().isOk());
   }
 
   @Test
@@ -130,7 +178,8 @@ class TimeEntryControllerTest {
   @Test
   void testGetActiveTimer_Success() throws Exception {
     ActiveTimerResponse response =
-        new ActiveTimerResponse("userId", UUID.randomUUID(), Instant.now());
+        new ActiveTimerResponse(
+            "userId", UUID.randomUUID(), Instant.now(), false, 0, Instant.now());
 
     when(workspaceSecurity.hasRole(any(String[].class))).thenReturn(true);
     when(timeEntryService.getActiveTimer(any())).thenReturn(Optional.of(response));

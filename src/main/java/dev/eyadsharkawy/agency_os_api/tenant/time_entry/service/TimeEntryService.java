@@ -27,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class TimeEntryService {
+  private static final String NO_ACTIVE_TIMER_MESSAGE = "No active timer found for this user";
+
   private final TimeEntryRepository timeEntryRepository;
   private final ActiveTimerRepository activeTimerRepository;
   private final TaskRepository taskRepository;
@@ -51,7 +53,7 @@ public class TimeEntryService {
         targetUserId);
 
     Task task = findTaskByIdOrThrow(request.taskId());
-    validateUserIsAssignedToTask(targetUserId, task);
+    validateUserIsAssignedToTask(callerUserId, targetUserId, task);
 
     TimeEntry timeEntry = new TimeEntry();
     timeEntry.mapFromRequestWithIdAndTask(request, targetUserId, task);
@@ -70,30 +72,99 @@ public class TimeEntryService {
     }
 
     Task task = findTaskByIdOrThrow(taskId);
-    validateUserIsAssignedToTask(userId, task);
+    validateUserIsAssignedToTask(userId, userId, task);
 
     ActiveTimer activeTimer = new ActiveTimer();
     activeTimer.setUserId(userId);
     activeTimer.setTask(task);
     activeTimer.setStartTime(Instant.now());
+    activeTimer.setPaused(false);
+    activeTimer.setAccumulatedSeconds(0);
+    activeTimer.setLastResumeTimestamp(Instant.now());
 
     ActiveTimer savedActiveTimer = activeTimerRepository.save(activeTimer);
     return ActiveTimerResponse.fromEntity(savedActiveTimer);
   }
 
   @Transactional
+  public ActiveTimerResponse pauseTimer(Jwt jwt) {
+    String userId = jwt.getSubject();
+    log.info("User [{}] pausing active timer", userId);
+
+    ActiveTimer activeTimer =
+        activeTimerRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException(NO_ACTIVE_TIMER_MESSAGE));
+
+    if (!activeTimer.isPaused()) {
+      Instant lastResume =
+          activeTimer.getLastResumeTimestamp() != null
+              ? activeTimer.getLastResumeTimestamp()
+              : activeTimer.getStartTime();
+      int elapsedSeconds =
+          (int) Math.max(0, Duration.between(lastResume, Instant.now()).toSeconds());
+      activeTimer.setAccumulatedSeconds(activeTimer.getAccumulatedSeconds() + elapsedSeconds);
+      activeTimer.setPaused(true);
+      activeTimer.setLastResumeTimestamp(null);
+      activeTimer = activeTimerRepository.save(activeTimer);
+    }
+
+    return ActiveTimerResponse.fromEntity(activeTimer);
+  }
+
+  @Transactional
+  public ActiveTimerResponse resumeTimer(Jwt jwt) {
+    String userId = jwt.getSubject();
+    log.info("User [{}] resuming active timer", userId);
+
+    ActiveTimer activeTimer =
+        activeTimerRepository
+            .findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException(NO_ACTIVE_TIMER_MESSAGE));
+
+    if (activeTimer.isPaused()) {
+      activeTimer.setPaused(false);
+      activeTimer.setLastResumeTimestamp(Instant.now());
+      activeTimer = activeTimerRepository.save(activeTimer);
+    }
+
+    return ActiveTimerResponse.fromEntity(activeTimer);
+  }
+
+  @Transactional
+  public TimeEntryResponse stopTimer(Jwt jwt, boolean isBillable, Integer customDurationMinutes) {
+    return stopTimerInternal(jwt, isBillable, customDurationMinutes);
+  }
+
+  @Transactional
   public TimeEntryResponse stopTimer(Jwt jwt, boolean isBillable) {
+    return stopTimerInternal(jwt, isBillable, null);
+  }
+
+  private TimeEntryResponse stopTimerInternal(
+      Jwt jwt, boolean isBillable, Integer customDurationMinutes) {
     String userId = jwt.getSubject();
     log.info("User [{}] stopping active timer", userId);
 
     ActiveTimer activeTimer =
         activeTimerRepository
             .findById(userId)
-            .orElseThrow(
-                () -> new ResourceNotFoundException("No active timer found for this user"));
+            .orElseThrow(() -> new ResourceNotFoundException(NO_ACTIVE_TIMER_MESSAGE));
 
-    int durationMinutes =
-        Math.max(1, (int) Duration.between(activeTimer.getStartTime(), Instant.now()).toMinutes());
+    int durationMinutes;
+    if (customDurationMinutes != null && customDurationMinutes > 0) {
+      durationMinutes = customDurationMinutes;
+    } else {
+      int totalSeconds = activeTimer.getAccumulatedSeconds();
+      if (!activeTimer.isPaused()) {
+        Instant lastResume =
+            activeTimer.getLastResumeTimestamp() != null
+                ? activeTimer.getLastResumeTimestamp()
+                : activeTimer.getStartTime();
+        totalSeconds += (int) Math.max(0, Duration.between(lastResume, Instant.now()).toSeconds());
+      }
+      durationMinutes = Math.max(1, (int) Math.round(totalSeconds / 60.0));
+    }
 
     TimeEntry timeEntry = new TimeEntry();
     timeEntry.setTask(activeTimer.getTask());
@@ -118,15 +189,35 @@ public class TimeEntryService {
   }
 
   @Transactional(readOnly = true)
+  public List<TimeEntryResponse> getTimeEntries(UUID taskId, String userId) {
+    if (taskId != null) {
+      return getTimeEntriesByTaskIdInternal(taskId);
+    }
+    if (userId != null && !userId.isBlank()) {
+      return getTimeEntriesByUserIdInternal(userId);
+    }
+    log.info("Fetching all time entries for current tenant workspace");
+    return timeEntryRepository.findAll().stream().map(TimeEntryResponse::fromEntity).toList();
+  }
+
+  @Transactional(readOnly = true)
   public List<TimeEntryResponse> getTimeEntriesByTaskId(UUID taskId) {
+    return getTimeEntriesByTaskIdInternal(taskId);
+  }
+
+  @Transactional(readOnly = true)
+  public List<TimeEntryResponse> getTimeEntriesByUserId(String userId) {
+    return getTimeEntriesByUserIdInternal(userId);
+  }
+
+  private List<TimeEntryResponse> getTimeEntriesByTaskIdInternal(UUID taskId) {
     log.info("Fetching time entries for task: {}", taskId);
     return timeEntryRepository.findByTaskId(taskId).stream()
         .map(TimeEntryResponse::fromEntity)
         .toList();
   }
 
-  @Transactional(readOnly = true)
-  public List<TimeEntryResponse> getTimeEntriesByUserId(String userId) {
+  private List<TimeEntryResponse> getTimeEntriesByUserIdInternal(String userId) {
     log.info("Fetching time entries for user: {}", userId);
     return timeEntryRepository.findByUserId(userId).stream()
         .map(TimeEntryResponse::fromEntity)
@@ -150,8 +241,11 @@ public class TimeEntryService {
         .orElseThrow(() -> new ResourceNotFoundException("Task not found with id: " + taskId));
   }
 
-  private void validateUserIsAssignedToTask(String userId, Task task) {
-    if (task.getAssigneeIds() == null || !task.getAssigneeIds().contains(userId)) {
+  private void validateUserIsAssignedToTask(String callerUserId, String targetUserId, Task task) {
+    if (callerUserId.equals(targetUserId) && workspaceSecurity.hasRole("OWNER", "ADMIN")) {
+      return;
+    }
+    if (task.getAssigneeIds() == null || !task.getAssigneeIds().contains(targetUserId)) {
       throw new IllegalArgumentException("User is not assigned to this task.");
     }
   }

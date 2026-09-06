@@ -55,6 +55,20 @@ public class TimeEntryController {
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
+  @GetMapping
+  @Operation(
+      summary = "Get time entries",
+      description =
+          "Retrieves the list of all logged time entries in the current workspace, optionally filtered by task or user ID.")
+  public ResponseEntity<List<TimeEntryResponse>> getTimeEntries(
+      @Parameter(description = "Optional filter by task ID") @RequestParam(required = false)
+          UUID taskId,
+      @Parameter(description = "Optional filter by user ID") @RequestParam(required = false)
+          String userId) {
+    List<TimeEntryResponse> responses = timeEntryService.getTimeEntries(taskId, userId);
+    return ResponseEntity.ok(responses);
+  }
+
   @PostMapping("/start/{taskId}")
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(
@@ -72,6 +86,33 @@ public class TimeEntryController {
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
+  @PostMapping("/pause")
+  @Operation(
+      summary = "Pause stopwatch timer",
+      description =
+          "Pauses the currently running stopwatch timer for the user and persists accumulated active time.")
+  public ResponseEntity<ActiveTimerResponse> pauseTimer(@AuthenticationPrincipal Jwt jwt) {
+    ActiveTimerResponse response = timeEntryService.pauseTimer(jwt);
+
+    String tenantId = TenantContextHolder.getTenantId();
+    broadcastService.broadcast(TOPIC_PREFIX + tenantId + "/timers/pause", response);
+
+    return ResponseEntity.ok(response);
+  }
+
+  @PostMapping("/resume")
+  @Operation(
+      summary = "Resume stopwatch timer",
+      description = "Resumes a paused stopwatch timer for the user.")
+  public ResponseEntity<ActiveTimerResponse> resumeTimer(@AuthenticationPrincipal Jwt jwt) {
+    ActiveTimerResponse response = timeEntryService.resumeTimer(jwt);
+
+    String tenantId = TenantContextHolder.getTenantId();
+    broadcastService.broadcast(TOPIC_PREFIX + tenantId + "/timers/resume", response);
+
+    return ResponseEntity.ok(response);
+  }
+
   @PostMapping("/stop")
   @Operation(
       summary = "Stop stopwatch timer",
@@ -81,8 +122,12 @@ public class TimeEntryController {
       @AuthenticationPrincipal Jwt jwt,
       @Parameter(description = "Whether this tracked entry is billable to the client")
           @RequestParam(defaultValue = "true")
-          boolean isBillable) {
-    TimeEntryResponse response = timeEntryService.stopTimer(jwt, isBillable);
+          boolean isBillable,
+      @Parameter(
+              description = "Optional explicit duration in minutes (e.g. factoring in paused time)")
+          @RequestParam(required = false)
+          Integer durationMinutes) {
+    TimeEntryResponse response = timeEntryService.stopTimer(jwt, isBillable, durationMinutes);
 
     String tenantId = TenantContextHolder.getTenantId();
     broadcastService.broadcast(TOPIC_PREFIX + tenantId + "/timers/stop", response);
