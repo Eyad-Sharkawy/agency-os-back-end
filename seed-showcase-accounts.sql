@@ -5,6 +5,12 @@
 -- 1. PUBLIC SCHEMA: Users & Workspace Setup
 SET search_path TO public;
 
+GRANT ALL ON SCHEMA public TO PUBLIC;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO PUBLIC;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO PUBLIC;
+
 -- Clean existing demo data if re-running
 DELETE
 FROM public.workspaces
@@ -57,6 +63,14 @@ VALUES ('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaa
 -- 2. TENANT SCHEMA: Provision & Seed Realistic Multi-Tenant Data
 -- =========================================================================
 CREATE SCHEMA IF NOT EXISTS tenant_apex_digital_demo;
+GRANT ALL ON SCHEMA tenant_apex_digital_demo TO PUBLIC;
+GRANT ALL ON ALL TABLES IN SCHEMA tenant_apex_digital_demo TO PUBLIC;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA tenant_apex_digital_demo TO PUBLIC;
+GRANT ALL ON ALL ROUTINES IN SCHEMA tenant_apex_digital_demo TO PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA tenant_apex_digital_demo GRANT ALL ON TABLES TO PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA tenant_apex_digital_demo GRANT ALL ON SEQUENCES TO PUBLIC;
+ALTER DEFAULT PRIVILEGES IN SCHEMA tenant_apex_digital_demo GRANT ALL ON ROUTINES TO PUBLIC;
+
 SET search_path TO tenant_apex_digital_demo;
 
 -- Schema Tables
@@ -287,3 +301,38 @@ VALUES ('8e0ad35e-1f73-47c1-afd4-dbcae86a3bb6', 'da000000-0000-0000-0000-0000000
         NOW() - INTERVAL '1 hour 24 minutes', false, 5040),
        ('4c223473-fc1e-4686-813b-dd50a87fa654', 'da000000-0000-0000-0000-000000000004', NOW() - INTERVAL '45 minutes',
         true, 2700);
+
+-- =========================================================================
+-- 4. PERMISSIONS & FLYWAY BASELINE
+-- =========================================================================
+GRANT ALL ON ALL TABLES IN SCHEMA tenant_apex_digital_demo TO PUBLIC;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA tenant_apex_digital_demo TO PUBLIC;
+
+CREATE TABLE IF NOT EXISTS tenant_apex_digital_demo.flyway_schema_history
+(
+    installed_rank INT           NOT NULL PRIMARY KEY,
+    version        VARCHAR(50),
+    description    VARCHAR(200)  NOT NULL,
+    type           VARCHAR(20)   NOT NULL,
+    script         VARCHAR(1000) NOT NULL,
+    checksum       INT,
+    installed_by   VARCHAR(100)  NOT NULL,
+    installed_on   TIMESTAMP     NOT NULL DEFAULT now(),
+    execution_time INT           NOT NULL,
+    success        BOOLEAN       NOT NULL
+);
+
+INSERT INTO tenant_apex_digital_demo.flyway_schema_history
+(installed_rank, version, description, type, script, checksum, installed_by, installed_on, execution_time, success)
+VALUES (1, '1', 'init tenant', 'SQL', 'V1__init_tenant.sql', NULL, 'seed_script', now(), 1, true),
+       (2, '2', 'add client users', 'SQL', 'V2__add_client_users.sql', NULL, 'seed_script', now(), 1, true),
+       (3, '3', 'add workspace invitations', 'SQL', 'V3__add_workspace_invitations.sql', NULL, 'seed_script', now(), 1,
+        true),
+       (4, '4', 'add project description', 'SQL', 'V4__add_project_description.sql', NULL, 'seed_script', now(), 1,
+        true),
+       (5, '5', 'add timer pause support', 'SQL', 'V5__add_timer_pause_support.sql', NULL, 'seed_script', now(), 1,
+        true)
+ON CONFLICT (installed_rank) DO NOTHING;
+
+GRANT ALL ON ALL TABLES IN SCHEMA tenant_apex_digital_demo TO PUBLIC;
+

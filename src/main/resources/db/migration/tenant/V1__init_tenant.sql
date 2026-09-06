@@ -1,5 +1,5 @@
 -- V1__init_tenant.sql
-CREATE TABLE clients
+CREATE TABLE IF NOT EXISTS clients
 (
     id         UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
     name       VARCHAR(255) NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE clients
     updated_at TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
-CREATE TABLE projects
+CREATE TABLE IF NOT EXISTS projects
 (
     id           UUID PRIMARY KEY        DEFAULT gen_random_uuid(),
     client_id    UUID           NOT NULL REFERENCES clients (id) ON DELETE RESTRICT,
@@ -25,7 +25,7 @@ CREATE TABLE projects
     updated_at   TIMESTAMPTZ    NOT NULL DEFAULT now()
 );
 
-CREATE TABLE tasks
+CREATE TABLE IF NOT EXISTS tasks
 (
     id                UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
     project_id        UUID         NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
@@ -42,14 +42,14 @@ CREATE TABLE tasks
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
-CREATE TABLE task_assignees
+CREATE TABLE IF NOT EXISTS task_assignees
 (
     task_id UUID REFERENCES tasks (id) ON DELETE CASCADE,
     user_id VARCHAR(255) NOT NULL, -- Keycloak ID
     PRIMARY KEY (task_id, user_id)
 );
 
-CREATE TABLE time_entries
+CREATE TABLE IF NOT EXISTS time_entries
 (
     id               UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
     task_id          UUID         NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
@@ -60,14 +60,14 @@ CREATE TABLE time_entries
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
-CREATE TABLE active_timers
+CREATE TABLE IF NOT EXISTS active_timers
 (
     user_id    VARCHAR(255) PRIMARY KEY,
     task_id    UUID        NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
     start_time TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE invoices
+CREATE TABLE IF NOT EXISTS invoices
 (
     id           UUID PRIMARY KEY        DEFAULT gen_random_uuid(),
     client_id    UUID           NOT NULL REFERENCES clients (id) ON DELETE RESTRICT,
@@ -78,14 +78,13 @@ CREATE TABLE invoices
     updated_at   TIMESTAMPTZ    NOT NULL DEFAULT now()
 );
 
-
 ALTER TABLE time_entries
-    ADD COLUMN invoice_id UUID REFERENCES invoices (id) ON DELETE SET NULL;
+    ADD COLUMN IF NOT EXISTS invoice_id UUID REFERENCES invoices (id) ON DELETE SET NULL;
 
-CREATE INDEX idx_projects_client_id ON projects (client_id);
-CREATE INDEX idx_tasks_project_id ON tasks (project_id);
-CREATE INDEX idx_task_assignees_user_id ON task_assignees (user_id);
-CREATE INDEX idx_time_entries_task_id ON time_entries (task_id);
-CREATE INDEX idx_time_entries_user_id ON time_entries (user_id);
-CREATE INDEX idx_invoices_client_id ON invoices (client_id);
-CREATE INDEX idx_time_entries_invoice_id ON time_entries (invoice_id);
+CREATE INDEX IF NOT EXISTS idx_projects_client_id ON projects (client_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks (project_id);
+CREATE INDEX IF NOT EXISTS idx_task_assignees_user_id ON task_assignees (user_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_task_id ON time_entries (task_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_user_id ON time_entries (user_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON invoices (client_id);
+CREATE INDEX IF NOT EXISTS idx_time_entries_invoice_id ON time_entries (invoice_id);
