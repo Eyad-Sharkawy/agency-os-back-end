@@ -255,12 +255,16 @@ public class InvoicePdfGenerator {
           yPosition = newPageHeaderY - 30f; // Reset Y drawing coordinate
         }
 
-        double hoursVal = entry.getDurationMinutes() / 60.0;
-        BigDecimal billingRate = entry.getTask().getProject().getBillingRate();
-        BigDecimal entryCost =
-            BigDecimal.valueOf(hoursVal).multiply(billingRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal hours =
+            BigDecimal.valueOf(entry.getDurationMinutes())
+                .divide(BigDecimal.valueOf(60.0), 4, RoundingMode.HALF_UP);
+        BigDecimal billingRate =
+            entry.getTask().getProject().getBillingRate() != null
+                ? entry.getTask().getProject().getBillingRate()
+                : BigDecimal.ZERO;
+        BigDecimal entryCost = hours.multiply(billingRate).setScale(2, RoundingMode.HALF_UP);
 
-        // DESCRIPTION (Project - Task title + hours logged)
+        // DESCRIPTION (Project - Task title + duration logged)
         contentStream.beginText();
         contentStream.setFont(standardFont, 10);
         contentStream.setNonStrokingColor(0, 0, 0);
@@ -268,7 +272,9 @@ public class InvoicePdfGenerator {
         String projectNameVal = entry.getTask().getProject().getName();
         String taskTitleVal = entry.getTask().getTitle();
         String itemDesc =
-            String.format("%s - %s (%.1f hrs)", projectNameVal, taskTitleVal, hoursVal);
+            String.format(
+                "%s - %s (%s)",
+                projectNameVal, taskTitleVal, formatDuration(entry.getDurationMinutes()));
         contentStream.showText(itemDesc);
         contentStream.endText();
 
@@ -362,5 +368,21 @@ public class InvoicePdfGenerator {
       document.save(baos);
       return baos.toByteArray();
     }
+  }
+
+  static String formatDuration(int minutes) {
+    if (minutes <= 0) {
+      return "0 mins";
+    }
+    if (minutes < 60) {
+      return minutes + (minutes == 1 ? " min" : " mins");
+    }
+    int hours = minutes / 60;
+    int remMinutes = minutes % 60;
+    if (remMinutes == 0) {
+      return hours + (hours == 1 ? " hr" : " hrs");
+    }
+    return String.format(
+        "%d hr%s %d min%s", hours, hours > 1 ? "s" : "", remMinutes, remMinutes > 1 ? "s" : "");
   }
 }

@@ -129,4 +129,40 @@ class InvoicePdfGeneratorTest {
 
     assertThat(pdf).isNotNull().hasSizeGreaterThan(0);
   }
+
+  @Test
+  @DisplayName("generate should handle small duration entries like 1 minute without error")
+  void generate_SmallDurationEntry_Success() throws IOException {
+    Task task = new Task();
+    task.setId(UUID.randomUUID());
+    task.setTitle("Quick Bug Fix");
+    task.setProject(project1);
+
+    TimeEntry entry = new TimeEntry();
+    entry.setId(UUID.randomUUID());
+    entry.setTask(task);
+    entry.setDurationMinutes(1);
+
+    byte[] pdf =
+        InvoicePdfGenerator.generate(invoice, "Acme Agency", "contact@acme.com", List.of(entry));
+
+    assertThat(pdf).isNotNull().hasSizeGreaterThan(0);
+  }
+
+  @Test
+  @DisplayName("formatDuration should smartly format minutes into clear readable strings")
+  void formatDuration_AllCases() {
+    assertThat(InvoicePdfGenerator.formatDuration(0)).isEqualTo("0 mins");
+    assertThat(InvoicePdfGenerator.formatDuration(-5)).isEqualTo("0 mins");
+    assertThat(InvoicePdfGenerator.formatDuration(1)).isEqualTo("1 min");
+    assertThat(InvoicePdfGenerator.formatDuration(2)).isEqualTo("2 mins");
+    assertThat(InvoicePdfGenerator.formatDuration(15)).isEqualTo("15 mins");
+    assertThat(InvoicePdfGenerator.formatDuration(59)).isEqualTo("59 mins");
+    assertThat(InvoicePdfGenerator.formatDuration(60)).isEqualTo("1 hr");
+    assertThat(InvoicePdfGenerator.formatDuration(61)).isEqualTo("1 hr 1 min");
+    assertThat(InvoicePdfGenerator.formatDuration(75)).isEqualTo("1 hr 15 mins");
+    assertThat(InvoicePdfGenerator.formatDuration(120)).isEqualTo("2 hrs");
+    assertThat(InvoicePdfGenerator.formatDuration(121)).isEqualTo("2 hrs 1 min");
+    assertThat(InvoicePdfGenerator.formatDuration(135)).isEqualTo("2 hrs 15 mins");
+  }
 }
